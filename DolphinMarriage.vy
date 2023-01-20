@@ -52,16 +52,11 @@ def setOwnerRpl(newOwnerRpl: address):
   assert msg.sender == self.ownerRpl, "only ownerRpl can set ownerRpl"
   self.ownerRpl = newOwnerRpl
 
-@external
-def addRplPrincipal(amount: uint256):
-  assert msg.sender == self.ownerRpl, "only ownerRpl can initiate add principal"
-  self.pendingAddRplPrincipal = amount
-
-@external
-def confirmAddRplPrincipal(amount: uint256):
-  assert msg.sender == self.ownerEth, "only ownerEth can confirm add principal"
-  assert amount == self.pendingAddRplPrincipal, "incorrect amount"
-  self.rplPrincipal += amount
+@internal
+def _getNodeRPLStake() -> uint256:
+  rocketNodeStakingAddress: address = rocketStorage.getAddress(rocketNodeStakingKey)
+  rocketNodeStaking: RocketNodeStakingInterface = RocketNodeStakingInterface(rocketNodeStakingAddress)
+  return rocketNodeStaking.getNodeRPLStake(nodeAddress)
 
 @external
 def setRplFee(numerator: uint256, denominator: uint256):
@@ -78,12 +73,17 @@ def confirmRplFee(numerator: uint256, denominator: uint256):
   self.rplFeeDenominator = denominator
 
 @external
-def withdrawEth():
-  assert msg.sender == self.ownerEth, "only ownerEth can withdrawEth"
-  assert RocketNodeStakingInterface(
-    rocketStorage.getAddress(rocketNodeStakingKey)).getNodeRPLStake(
-      nodeAddress) == 0, "unstake RPL before withdrawing ETH"
-  send(self.ownerEth, self.balance)
+def updateRplPrincipal():
+  assert msg.sender == self.ownerRpl, "only ownerRpl can set principal"
+  self.rplPrincipal = self._getNodeRPLStake()
+
+@external
+def withdrawRplPrincipal(amount: uint256):
+  assert msg.sender == self.ownerRpl, "only ownerRpl can withdrawRplPrincipal"
+  assert amount <= self.rplPrincipal, "amount exceeds principal"
+  assert amount <= rplToken.balanceOf(self), "amount exceeds balance"
+  assert rplToken.transfer(self.ownerRpl, amount), "rpl principal transfer failed"
+  self.rplPrincipal -= amount
 
 @external
 def withdrawRewards(amount: uint256):
@@ -96,12 +96,10 @@ def withdrawRewards(amount: uint256):
   send(self.ownerEth, self.balance)
 
 @external
-def withdrawRplPrincipal(amount: uint256):
-  assert msg.sender == self.ownerRpl, "only ownerRpl can withdrawRplPrincipal"
-  assert amount <= self.rplPrincipal, "amount exceeds principal"
-  assert amount <= rplToken.balanceOf(self), "amount exceeds balance"
-  assert rplToken.transfer(self.ownerRpl, amount), "rpl principal transfer failed"
-  self.rplPrincipal -= amount
+def withdrawEth():
+  assert msg.sender == self.ownerEth, "only ownerEth can withdrawEth"
+  assert self._getNodeRPLStake() == 0, "unstake RPL before withdrawing ETH"
+  send(self.ownerEth, self.balance)
 
 @external
 def rpConfirmWithdrawalAddress():
