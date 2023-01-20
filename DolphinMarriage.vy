@@ -71,9 +71,10 @@ def confirmRplFee(numerator: uint256, denominator: uint256):
   self.rplFeeDenominator = denominator
 
 @external
-def updateRplPrincipal():
+def updateRplPrincipal(_expectedAmount: uint256):
   assert msg.sender == self.ownerRpl, "only ownerRpl can set principal"
-  self.rplPrincipal = self._getNodeRPLStake()
+  assert _expectedAmount == self._getNodeRPLStake(), "incorrect RPL stake amount"
+  self.rplPrincipal = _expectedAmount
 
 @external
 def withdrawRplPrincipal(amount: uint256):
