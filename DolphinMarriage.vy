@@ -76,11 +76,13 @@ def withdrawEth():
   send(self.ownerEth, self.balance)
 
 @external
-def withdrawRplRewards():
+def withdrawRplRewards(amount: uint256):
   assert msg.sender == self.ownerRpl, "only ownerRpl can withdrawRplRewards"
-  fee: uint256 = rplToken.balanceOf(self) * self.rplFeeNumerator / self.rplFeeDenominator
+  assert amount <= rplToken.balanceOf(self), "amount exceeds balance"
+  fee: uint256 = amount * self.rplFeeNumerator / self.rplFeeDenominator
+  assert fee <= amount, "fee exceeds amount"
   assert rplToken.transfer(self.ownerEth, fee), "fee transfer failed"
-  assert rplToken.transfer(self.ownerRpl, rplToken.balanceOf(self)), "rpl rewards transfer failed"
+  assert rplToken.transfer(self.ownerRpl, amount - fee), "rpl rewards transfer failed"
 
 @external
 def withdrawRplPrincipal(amount: uint256):
