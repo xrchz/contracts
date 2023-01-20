@@ -5,13 +5,19 @@ interface RplInterface:
   def transfer(_to: address, _wad: uint256) -> bool: nonpayable
 
 interface RocketStorageInterface:
+  def getAddress(_key: bytes32) -> address: view
   def confirmWithdrawalAddress(_nodeAddress: address): nonpayable
 
+interface RocketNodeStakingInterface:
+  def getNodeRPLStake(_nodeAddress: address) -> uint256: view
+
+rocketNodeStakingKey: constant(bytes32) = keccak256("contract.addressrocketNodeStaking")
 rocketStorageAddress: constant(address) = 0x1d8f8f00cfa6758d7bE78336684788Fb0ee0Fa46
 rplTokenAddress: constant(address) = 0xD33526068D116cE69F19A9ee46F0bd304F21A51f
 rocketStorage: immutable(RocketStorageInterface)
 rplToken: immutable(RplInterface)
 
+nodeAddress: immutable(address)
 ownerEth: public(address)
 ownerRpl: public(address)
 
@@ -24,11 +30,12 @@ pendingRplFeeNumerator: public(uint256)
 pendingRplFeeDenominator: public(uint256)
 
 @external
-def __init__(ownerRplAddress: address):
+def __init__(_ownerRpl: address, _nodeAddress: address):
   rocketStorage = RocketStorageInterface(rocketStorageAddress)
   rplToken = RplInterface(rplTokenAddress)
+  nodeAddress = _nodeAddress
   self.ownerEth = msg.sender
-  self.ownerRpl = ownerRplAddress
+  self.ownerRpl = _ownerRpl
 
 @external
 @payable
@@ -73,16 +80,20 @@ def confirmRplFee(numerator: uint256, denominator: uint256):
 @external
 def withdrawEth():
   assert msg.sender == self.ownerEth, "only ownerEth can withdrawEth"
+  assert RocketNodeStakingInterface(
+    rocketStorage.getAddress(rocketNodeStakingKey)).getNodeRPLStake(
+      nodeAddress) == 0, "unstake RPL before withdrawing ETH"
   send(self.ownerEth, self.balance)
 
 @external
-def withdrawRplRewards(amount: uint256):
-  assert msg.sender == self.ownerRpl, "only ownerRpl can withdrawRplRewards"
+def withdrawRewards(amount: uint256):
+  assert msg.sender == self.ownerRpl, "only ownerRpl can withdrawRewards"
   assert amount <= rplToken.balanceOf(self), "amount exceeds balance"
   fee: uint256 = amount * self.rplFeeNumerator / self.rplFeeDenominator
   assert fee <= amount, "fee exceeds amount"
   assert rplToken.transfer(self.ownerEth, fee), "fee transfer failed"
   assert rplToken.transfer(self.ownerRpl, amount - fee), "rpl rewards transfer failed"
+  send(self.ownerEth, self.balance)
 
 @external
 def withdrawRplPrincipal(amount: uint256):
@@ -93,5 +104,5 @@ def withdrawRplPrincipal(amount: uint256):
   self.rplPrincipal -= amount
 
 @external
-def rpConfirmWithdrawalAddress(nodeAddress: address):
+def rpConfirmWithdrawalAddress():
   rocketStorage.confirmWithdrawalAddress(nodeAddress)
