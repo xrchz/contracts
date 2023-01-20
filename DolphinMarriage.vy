@@ -22,8 +22,6 @@ ownerEth: public(address)
 ownerRpl: public(address)
 
 rplPrincipal: public(uint256)
-pendingAddRplPrincipal: public(uint256)
-
 rplFeeNumerator: public(uint256)
 rplFeeDenominator: public(uint256)
 pendingRplFeeNumerator: public(uint256)
