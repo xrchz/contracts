@@ -15,6 +15,9 @@ rplToken: immutable(RplInterface)
 ownerEth: public(address)
 ownerRpl: public(address)
 
+rplPrincipal: public(uint256)
+pendingAddRplPrincipal: public(uint256)
+
 rplFeeNumerator: public(uint256)
 rplFeeDenominator: public(uint256)
 pendingRplFeeNumerator: public(uint256)
@@ -43,6 +46,17 @@ def setOwnerRpl(newOwnerRpl: address):
   self.ownerRpl = newOwnerRpl
 
 @external
+def addRplPrincipal(amount: uint256):
+  assert msg.sender == self.ownerRpl, "only ownerRpl can initiate add principal"
+  self.pendingAddRplPrincipal = amount
+
+@external
+def confirmAddRplPrincipal(amount: uint256):
+  assert msg.sender == self.ownerEth, "only ownerEth can confirm add principal"
+  assert amount == self.pendingAddRplPrincipal, "incorrect amount"
+  self.rplPrincipal += amount
+
+@external
 def setRplFee(numerator: uint256, denominator: uint256):
   assert msg.sender == self.ownerEth, "only ownerEth can initiate fee change"
   self.pendingRplFeeNumerator = numerator
@@ -62,11 +76,19 @@ def withdrawEth():
   send(self.ownerEth, self.balance)
 
 @external
-def withdrawRpl():
-  assert msg.sender == self.ownerRpl or msg.sender == self.ownerEth, "only owner can withdrawRpl"
+def withdrawRplRewards():
+  assert msg.sender == self.ownerRpl, "only ownerRpl can withdrawRplRewards"
   fee: uint256 = rplToken.balanceOf(self) * self.rplFeeNumerator / self.rplFeeDenominator
   assert rplToken.transfer(self.ownerEth, fee), "fee transfer failed"
-  assert rplToken.transfer(self.ownerRpl, rplToken.balanceOf(self)), "rpl transfer failed"
+  assert rplToken.transfer(self.ownerRpl, rplToken.balanceOf(self)), "rpl rewards transfer failed"
+
+@external
+def withdrawRplPrincipal(amount: uint256):
+  assert msg.sender == self.ownerRpl, "only ownerRpl can withdrawRplPrincipal"
+  assert amount <= self.rplPrincipal, "amount exceeds principal"
+  assert amount <= rplToken.balanceOf(self), "amount exceeds balance"
+  assert rplToken.transfer(self.ownerRpl, amount), "rpl principal transfer failed"
+  self.rplPrincipal -= amount
 
 @external
 def rpConfirmWithdrawalAddress(nodeAddress: address):
