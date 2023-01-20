@@ -49,10 +49,12 @@ def setRplFee(numerator: uint256, denominator: uint256):
   self.pendingRplFeeDenominator = denominator
 
 @external
-def confirmRplFee():
+def confirmRplFee(numerator: uint256, denominator: uint256):
   assert msg.sender == self.ownerRpl, "only ownerRpl can confirm fee change"
-  self.rplFeeNumerator = self.pendingRplFeeNumerator
-  self.rplFeeDenominator = self.pendingRplFeeDenominator
+  assert numerator == self.pendingRplFeeNumerator, "incorrect numerator"
+  assert denominator == self.pendingRplFeeDenominator, "incorrect denominator"
+  self.rplFeeNumerator = numerator
+  self.rplFeeDenominator = denominator
 
 @external
 def withdrawEth():
