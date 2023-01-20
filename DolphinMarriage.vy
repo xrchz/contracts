@@ -41,14 +41,14 @@ def __default__():
   pass
 
 @external
-def setOwnerEth(newOwnerEth: address):
+def setOwnerEth(_newOwnerEth: address):
   assert msg.sender == self.ownerEth, "only ownerEth can set ownerEth"
-  self.ownerEth = newOwnerEth
+  self.ownerEth = _newOwnerEth
 
 @external
-def setOwnerRpl(newOwnerRpl: address):
+def setOwnerRpl(_newOwnerRpl: address):
   assert msg.sender == self.ownerRpl, "only ownerRpl can set ownerRpl"
-  self.ownerRpl = newOwnerRpl
+  self.ownerRpl = _newOwnerRpl
 
 @internal
 def _getNodeRPLStake() -> uint256:
@@ -57,18 +57,18 @@ def _getNodeRPLStake() -> uint256:
   return rocketNodeStaking.getNodeRPLStake(nodeAddress)
 
 @external
-def setRplFee(numerator: uint256, denominator: uint256):
+def setRplFee(_numerator: uint256, _denominator: uint256):
   assert msg.sender == self.ownerEth, "only ownerEth can initiate fee change"
-  self.pendingRplFeeNumerator = numerator
-  self.pendingRplFeeDenominator = denominator
+  self.pendingRplFeeNumerator = _numerator
+  self.pendingRplFeeDenominator = _denominator
 
 @external
-def confirmRplFee(numerator: uint256, denominator: uint256):
+def confirmRplFee(_numerator: uint256, _denominator: uint256):
   assert msg.sender == self.ownerRpl, "only ownerRpl can confirm fee change"
-  assert numerator == self.pendingRplFeeNumerator, "incorrect numerator"
-  assert denominator == self.pendingRplFeeDenominator, "incorrect denominator"
-  self.rplFeeNumerator = numerator
-  self.rplFeeDenominator = denominator
+  assert _numerator == self.pendingRplFeeNumerator, "incorrect numerator"
+  assert _denominator == self.pendingRplFeeDenominator, "incorrect denominator"
+  self.rplFeeNumerator = _numerator
+  self.rplFeeDenominator = _denominator
 
 @external
 def updateRplPrincipal(_expectedAmount: uint256):
@@ -77,21 +77,21 @@ def updateRplPrincipal(_expectedAmount: uint256):
   self.rplPrincipal = _expectedAmount
 
 @external
-def withdrawRplPrincipal(amount: uint256):
+def withdrawRplPrincipal(_amount: uint256):
   assert msg.sender == self.ownerRpl, "only ownerRpl can withdrawRplPrincipal"
-  assert amount <= self.rplPrincipal, "amount exceeds principal"
-  assert amount <= rplToken.balanceOf(self), "amount exceeds balance"
-  assert rplToken.transfer(self.ownerRpl, amount), "rpl principal transfer failed"
-  self.rplPrincipal -= amount
+  assert _amount <= self.rplPrincipal, "amount exceeds principal"
+  assert _amount <= rplToken.balanceOf(self), "amount exceeds balance"
+  assert rplToken.transfer(self.ownerRpl, _amount), "rpl principal transfer failed"
+  self.rplPrincipal -= _amount
 
 @external
-def withdrawRewards(amount: uint256):
+def withdrawRewards(_amount: uint256):
   assert msg.sender == self.ownerRpl, "only ownerRpl can withdrawRewards"
-  assert amount <= rplToken.balanceOf(self), "amount exceeds balance"
-  fee: uint256 = amount * self.rplFeeNumerator / self.rplFeeDenominator
-  assert fee <= amount, "fee exceeds amount"
+  assert _amount <= rplToken.balanceOf(self), "amount exceeds balance"
+  fee: uint256 = _amount * self.rplFeeNumerator / self.rplFeeDenominator
+  assert fee <= _amount, "fee exceeds amount"
   assert rplToken.transfer(self.ownerEth, fee), "fee transfer failed"
-  assert rplToken.transfer(self.ownerRpl, amount - fee), "rpl rewards transfer failed"
+  assert rplToken.transfer(self.ownerRpl, _amount - fee), "rpl rewards transfer failed"
   send(self.ownerEth, self.balance)
 
 @external
