@@ -42,7 +42,7 @@ def setOwnerEth(newOwnerEth: address):
 
 @external
 def setOwnerRpl(newOwnerRpl: address):
-  assert msg.sender == self.ownerRpl, "owner ownerRpl can set ownerRpl"
+  assert msg.sender == self.ownerRpl, "only ownerRpl can set ownerRpl"
   self.ownerRpl = newOwnerRpl
 
 @external
