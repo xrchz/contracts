@@ -18,9 +18,10 @@ rplTokenAddress: constant(address) = 0xD33526068D116cE69F19A9ee46F0bd304F21A51f
 rocketStorage: immutable(RocketStorageInterface)
 rplToken: immutable(RplInterface)
 
-nodeAddress: immutable(address)
 ownerEth: public(address)
 ownerRpl: public(address)
+nodeAddress: public(address)
+pendingNodeAddress: public(address)
 pendingWithdrawalAddress: public(address)
 
 rplPrincipal: public(uint256)
@@ -30,10 +31,9 @@ pendingRplFeeNumerator: public(uint256)
 pendingRplFeeDenominator: public(uint256)
 
 @external
-def __init__(_ownerRpl: address, _nodeAddress: address):
+def __init__(_ownerRpl: address):
   rocketStorage = RocketStorageInterface(rocketStorageAddress)
   rplToken = RplInterface(rplTokenAddress)
-  nodeAddress = _nodeAddress
   self.ownerEth = msg.sender
   self.ownerRpl = _ownerRpl
 
@@ -56,7 +56,7 @@ def setOwnerRpl(_newOwnerRpl: address):
 def _getNodeRPLStake() -> uint256:
   rocketNodeStakingAddress: address = rocketStorage.getAddress(rocketNodeStakingKey)
   rocketNodeStaking: RocketNodeStakingInterface = RocketNodeStakingInterface(rocketNodeStakingAddress)
-  return rocketNodeStaking.getNodeRPLStake(nodeAddress)
+  return rocketNodeStaking.getNodeRPLStake(self.nodeAddress)
 
 @external
 def setRplFee(_numerator: uint256, _denominator: uint256):
@@ -103,7 +103,18 @@ def withdrawEth():
 
 @external
 def rpConfirmWithdrawalAddress():
-  rocketStorage.confirmWithdrawalAddress(nodeAddress)
+  rocketStorage.confirmWithdrawalAddress(self.nodeAddress)
+
+@external
+def changeNodeAddress(_newNodeAddress: address):
+  assert msg.sender == self.ownerEth, "only ownerEth can changeNodeAddress"
+  self.pendingNodeAddress = _newNodeAddress
+
+@external
+def confirmChangeNodeAddress(_newNodeAddress: address):
+  assert msg.sender == self.ownerRpl, "only ownerRpl can confirmChangeNodeAddress"
+  assert _newNodeAddress == self.pendingNodeAddress, "incorrect address"
+  self.nodeAddress = _newNodeAddress
 
 @external
 def changeWithdrawalAddress(_newWithdrawalAddress: address):
@@ -114,4 +125,4 @@ def changeWithdrawalAddress(_newWithdrawalAddress: address):
 def confirmChangeWithdrawalAddress(_newWithdrawalAddress: address):
   assert msg.sender == self.ownerRpl, "only ownerRpl can confirmChangeWithdrawalAddress"
   assert _newWithdrawalAddress == self.pendingWithdrawalAddress, "incorrect address"
-  rocketStorage.setWithdrawalAddress(nodeAddress, _newWithdrawalAddress, False)
+  rocketStorage.setWithdrawalAddress(self.nodeAddress, _newWithdrawalAddress, False)
