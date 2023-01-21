@@ -7,6 +7,7 @@ interface RplInterface:
 interface RocketStorageInterface:
   def getAddress(_key: bytes32) -> address: view
   def confirmWithdrawalAddress(_nodeAddress: address): nonpayable
+  def setWithdrawalAddress(_nodeAddress: address, _newWithdrawalAddress: address, _confirm: bool): nonpayable
 
 interface RocketNodeStakingInterface:
   def getNodeRPLStake(_nodeAddress: address) -> uint256: view
@@ -20,6 +21,7 @@ rplToken: immutable(RplInterface)
 nodeAddress: immutable(address)
 ownerEth: public(address)
 ownerRpl: public(address)
+pendingWithdrawalAddress: public(address)
 
 rplPrincipal: public(uint256)
 rplFeeNumerator: public(uint256)
@@ -103,3 +105,14 @@ def withdrawEth():
 @external
 def rpConfirmWithdrawalAddress():
   rocketStorage.confirmWithdrawalAddress(nodeAddress)
+
+@external
+def changeWithdrawalAddress(_newWithdrawalAddress: address):
+  assert msg.sender == self.ownerEth, "only ownerEth can changeWithdrawalAddress"
+  self.pendingWithdrawalAddress = _newWithdrawalAddress
+
+@external
+def confirmChangeWithdrawalAddress(_newWithdrawalAddress: address):
+  assert msg.sender == self.ownerRpl, "only ownerRpl can confirmChangeWithdrawalAddress"
+  assert _newWithdrawalAddress == self.pendingWithdrawalAddress, "incorrect address"
+  rocketStorage.setWithdrawalAddress(nodeAddress, _newWithdrawalAddress, False)
