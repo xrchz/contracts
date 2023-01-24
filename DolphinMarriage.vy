@@ -12,11 +12,16 @@ interface RocketStorageInterface:
 interface RocketNodeStakingInterface:
   def getNodeRPLStake(_nodeAddress: address) -> uint256: view
 
+interface EnsRevRegInterface:
+  def setName(_name: String[64]) -> bytes32: nonpayable
+
 rocketNodeStakingKey: constant(bytes32) = keccak256("contract.addressrocketNodeStaking")
 rocketStorageAddress: constant(address) = 0x1d8f8f00cfa6758d7bE78336684788Fb0ee0Fa46
 rplTokenAddress: constant(address) = 0xD33526068D116cE69F19A9ee46F0bd304F21A51f
+ensRevRegAddress: constant(address) = 0x084b1c3C81545d370f3634392De611CaaBFf8148
 rocketStorage: immutable(RocketStorageInterface)
 rplToken: immutable(RplInterface)
+ensRevReg: immutable(EnsRevRegInterface)
 
 ownerEth: public(address)
 ownerRpl: public(address)
@@ -34,6 +39,7 @@ pendingRplFeeDenominator: public(uint256)
 def __init__(_ownerRpl: address):
   rocketStorage = RocketStorageInterface(rocketStorageAddress)
   rplToken = RplInterface(rplTokenAddress)
+  ensRevReg = EnsRevRegInterface(ensRevRegAddress)
   self.ownerEth = msg.sender
   self.ownerRpl = _ownerRpl
 
@@ -104,6 +110,10 @@ def withdrawEth():
 @external
 def rpConfirmWithdrawalAddress():
   rocketStorage.confirmWithdrawalAddress(self.nodeAddress)
+
+@external
+def ensSetName(_name: String[64]):
+  ensRevReg.setName(_name)
 
 @external
 def changeNodeAddress(_newNodeAddress: address):
