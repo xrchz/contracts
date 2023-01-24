@@ -16,9 +16,7 @@ interface EnsRevRegInterface:
   def setName(_name: String[64]) -> bytes32: nonpayable
 
 rocketNodeStakingKey: constant(bytes32) = keccak256("contract.addressrocketNodeStaking")
-rocketStorageAddress: constant(address) = 0x1d8f8f00cfa6758d7bE78336684788Fb0ee0Fa46
-rplTokenAddress: constant(address) = 0xD33526068D116cE69F19A9ee46F0bd304F21A51f
-ensRevRegAddress: constant(address) = 0x084b1c3C81545d370f3634392De611CaaBFf8148
+rocketTokenRPLKey: constant(bytes32) = keccak256("contract.addressrocketTokenRPL")
 rocketStorage: immutable(RocketStorageInterface)
 rplToken: immutable(RplInterface)
 ensRevReg: immutable(EnsRevRegInterface)
@@ -36,10 +34,10 @@ pendingRplFeeNumerator: public(uint256)
 pendingRplFeeDenominator: public(uint256)
 
 @external
-def __init__(_ownerRpl: address):
-  rocketStorage = RocketStorageInterface(rocketStorageAddress)
-  rplToken = RplInterface(rplTokenAddress)
-  ensRevReg = EnsRevRegInterface(ensRevRegAddress)
+def __init__(_ownerRpl: address, _rocketStorageAddress: address, _ensRevRegAddress: address):
+  rocketStorage = RocketStorageInterface(_rocketStorageAddress)
+  rplToken = RplInterface(rocketStorage.getAddress(rocketTokenRPLKey))
+  ensRevReg = EnsRevRegInterface(_ensRevRegAddress)
   self.ownerEth = msg.sender
   self.ownerRpl = _ownerRpl
 
