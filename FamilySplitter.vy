@@ -45,6 +45,12 @@ def confirmChangeOwner():
   self.owner = self.pendingOwner
 
 @external
+def changeBeneficiaries(_beneficiary1: address, _beneficiary2: address):
+  assert msg.sender == self.owner, "only owner can change beneficiaries"
+  self.beneficiary1 = _beneficiary1
+  self.beneficiary2 = _beneficiary2
+
+@external
 def changePayout(_numerator: uint256, _denominator: uint256):
   assert msg.sender == self.owner, "only owner can change payout"
   self.payoutNumerator = _numerator
