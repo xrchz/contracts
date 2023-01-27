@@ -21,9 +21,7 @@ owner: public(address)
 pendingOwner: public(address)
 
 beneficiary1: public(address)
-pendingBeneficiary1: public(address)
 beneficiary2: public(address)
-pendingBeneficiary2: public(address)
 
 nodeAddress: public(address)
 payoutNumerator: public(uint256)
