@@ -40,9 +40,9 @@ def changeOwner(_newOwner: address):
   self.pendingOwner = _newOwner
 
 @external
-def confirmChangeOwner(_newOwner: address):
+def confirmChangeOwner():
   assert msg.sender == self.pendingOwner, "incorrect address"
-  self.owner = _newOwner
+  self.owner = self.pendingOwner
 
 @external
 def changePayout(_numerator: uint256, _denominator: uint256):
