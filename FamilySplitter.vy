@@ -9,9 +9,6 @@ interface RocketStorageInterface:
   def confirmWithdrawalAddress(_nodeAddress: address): nonpayable
   def setWithdrawalAddress(_nodeAddress: address, _newWithdrawalAddress: address, _confirm: bool): nonpayable
 
-interface RocketNodeStakingInterface:
-  def getNodeRPLStake(_nodeAddress: address) -> uint256: view
-
 rocketNodeStakingKey: constant(bytes32) = keccak256("contract.addressrocketNodeStaking")
 rocketTokenRPLKey: constant(bytes32) = keccak256("contract.addressrocketTokenRPL")
 rocketStorage: immutable(RocketStorageInterface)
@@ -47,12 +44,6 @@ def changeOwner(_newOwner: address):
 def confirmChangeOwner(_newOwner: address):
   assert msg.sender == self.pendingOwner, "incorrect address"
   self.owner = _newOwner
-
-@internal
-def _getNodeRPLStake() -> uint256:
-  rocketNodeStakingAddress: address = rocketStorage.getAddress(rocketNodeStakingKey)
-  rocketNodeStaking: RocketNodeStakingInterface = RocketNodeStakingInterface(rocketNodeStakingAddress)
-  return rocketNodeStaking.getNodeRPLStake(self.nodeAddress)
 
 @external
 def changePayout(_numerator: uint256, _denominator: uint256):
