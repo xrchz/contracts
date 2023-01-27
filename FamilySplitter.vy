@@ -24,7 +24,7 @@ payoutNumerator: public(uint256)
 payoutDenominator: public(uint256)
 
 @external
-def __init__(_ownerRpl: address, _rocketStorageAddress: address):
+def __init__(_rocketStorageAddress: address):
   rocketStorage = RocketStorageInterface(_rocketStorageAddress)
   rplToken = RplInterface(rocketStorage.getAddress(rocketTokenRPLKey))
   self.owner = msg.sender
