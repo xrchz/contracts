@@ -9,7 +9,6 @@ interface RocketStorageInterface:
   def confirmWithdrawalAddress(_nodeAddress: address): nonpayable
   def setWithdrawalAddress(_nodeAddress: address, _newWithdrawalAddress: address, _confirm: bool): nonpayable
 
-rocketNodeStakingKey: constant(bytes32) = keccak256("contract.addressrocketNodeStaking")
 rocketTokenRPLKey: constant(bytes32) = keccak256("contract.addressrocketTokenRPL")
 rocketStorage: immutable(RocketStorageInterface)
 rplToken: immutable(RplInterface)
