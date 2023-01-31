@@ -68,7 +68,7 @@ def withdrawRpl(_amount: uint256):
 @external
 def withdrawEth(_amount: uint256):
   assert msg.sender == self.owner, "only owner can withdrawEth"
-  assert self.balance <= _amount, "amount exceeds balance"
+  assert _amount <= self.balance, "amount exceeds balance"
   send(self.owner, _amount)
 
 @external
