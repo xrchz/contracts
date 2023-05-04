@@ -84,10 +84,10 @@ def mint(_burnToken: ERC20, _value: uint256):
 score: public(HashMap[address, uint256])
 totalScore: public(uint256)
 
-AddToken: constant(uint256) = 0
+SubmitToken: constant(uint256) = 0
 DeleteToken: constant(uint256) = 1
 ChangePrice: constant(uint256) = 2
-ChangeCost: constant(uint256) = 3
+ChangeSpend: constant(uint256) = 3
 ChangeScore: constant(uint256) = 4
 numActions: constant(uint256) = 5
 
@@ -95,14 +95,14 @@ event Act:
   action: indexed(uint256)
   actor: indexed(address)
 
-costs: public(uint256[5])
-scores: public(uint256[5])
+spends: public(uint256[numActions])
+scores: public(uint256[numActions])
 
 @internal
 def _act(action: uint256, actor: address):
   assert action < numActions
-  assert ERC20(self).transferFrom(actor, empty(address), self.costs[action])
-  self.totalSupply -= self.costs[action]
+  assert ERC20(self).transferFrom(actor, empty(address), self.spends[action])
+  self.totalSupply -= self.spends[action]
   self.score[actor] += self.scores[action]
   self.totalScore += self.scores[action]
   log Act(action, actor)
@@ -116,7 +116,7 @@ def _changePrice(_burnToken: ERC20, _priceN: uint256, _priceD: uint256):
 @external
 def addToken(_burnToken: ERC20, _priceN: uint256, _priceD: uint256):
   assert not self.burnable[_burnToken], "already added"
-  self._act(AddToken, msg.sender)
+  self._act(SubmitToken, msg.sender)
   self.burnable[_burnToken] = True
   self._changePrice(_burnToken, _priceN, _priceD)
 
@@ -133,14 +133,31 @@ def changePrice(_burnToken: ERC20, _priceN: uint256, _priceD: uint256):
   self._changePrice(_burnToken, _priceN, _priceD)
 
 @external
-def changeCost(_action: uint256, _cost: uint256):
+def changeSpend(_action: uint256, _spend: uint256):
   assert _action < numActions
-  self._act(ChangeCost, msg.sender)
-  assert 0 < _cost, "invalid cost"
-  self.costs[_action] = _cost
+  self._act(ChangeSpend, msg.sender)
+  assert 0 < _spend, "invalid spend"
+  self.spends[_action] = _spend
 
 @external
 def changeScore(_action: uint256, _score: uint256):
   assert _action < numActions
   self._act(ChangeScore, msg.sender)
   self.scores[_action] = _score
+
+@external
+def __init__():
+  WETH: ERC20 = ERC20(0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2)
+  self.burnable[WETH] = True
+  self.priceN[WETH] = 1000000000
+  self.priceD[WETH] = 1
+  self.spends[SubmitToken] = 100
+  self.spends[DeleteToken] = 200
+  self.spends[ChangeSpend] = 144
+  self.spends[ChangePrice] = 189
+  self.spends[ChangeScore] = 243
+  self.scores[SubmitToken] = 4
+  self.scores[DeleteToken] = 7
+  self.scores[ChangeSpend] = 3
+  self.scores[ChangePrice] = 6
+  self.scores[ChangeScore] = 2
