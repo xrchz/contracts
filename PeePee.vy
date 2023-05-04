@@ -34,7 +34,7 @@ def symbol() -> String[8]:
 @external
 @view
 def decimals() -> uint8:
-  return 18
+  return 2
 
 totalSupply: public(uint256)
 
@@ -42,24 +42,23 @@ balanceOf: public(HashMap[address, uint256])
 
 allowance: public(HashMap[address, HashMap[address, uint256]])
 
+@internal
+def _transfer(_from: address, _to: address, _value: uint256):
+  assert _value <= self.balanceOf[_from], "insufficient balance"
+  self.balanceOf[_from] = unsafe_sub(self.balanceOf[_from], _value)
+  self.balanceOf[_to] = self.balanceOf[_to] + _value
+  log Transfer(_from, _to, _value)
+
 @external
 def transfer(_to: address, _value: uint256) -> bool:
-  assert _value <= self.balanceOf[msg.sender], "insufficient balance"
-  assert _value <= unsafe_sub(max_value(uint256), self.balanceOf[_to]), "overflow"
-  self.balanceOf[msg.sender] = unsafe_sub(self.balanceOf[msg.sender], _value)
-  self.balanceOf[_to] = unsafe_add(self.balanceOf[_to], _value)
-  log Transfer(msg.sender, _to, _value)
+  self._transfer(msg.sender, _to, _value)
   return True
 
 @external
 def transferFrom(_from: address, _to: address, _value: uint256) -> bool:
-  assert _value <= self.balanceOf[_from], "insufficient balance"
   assert _value <= self.allowance[msg.sender][_from], "insufficient allowance"
-  assert _value <= unsafe_sub(max_value(uint256), self.balanceOf[_to]), "overflow"
-  self.balanceOf[_from] = unsafe_sub(self.balanceOf[_from], _value)
   self.allowance[msg.sender][_from] = unsafe_sub(self.allowance[msg.sender][_from], _value)
-  self.balanceOf[_to] = unsafe_add(self.balanceOf[_to], _value)
-  log Transfer(_from, _to, _value)
+  self._transfer(_from, _to, _value)
   return True
 
 @external
@@ -67,3 +66,81 @@ def approve(_spender: address, _value: uint256) -> bool:
   self.allowance[msg.sender][_spender] = _value
   log Approval(msg.sender, _spender, _value)
   return True
+
+burnable: public(HashMap[ERC20, bool])
+
+priceN: public(HashMap[ERC20, uint256])
+priceD: public(HashMap[ERC20, uint256])
+
+@external
+def mint(_burnToken: ERC20, _value: uint256):
+  assert self.burnable[_burnToken], "invalid token"
+  assert _burnToken.transferFrom(msg.sender, self, _value)
+  amount: uint256 = (_value * self.priceN[_burnToken]) / self.priceD[_burnToken]
+  self.totalSupply += amount
+  self.balanceOf[empty(address)] = amount
+  self._transfer(empty(address), msg.sender, amount)
+
+score: public(HashMap[address, uint256])
+totalScore: public(uint256)
+
+AddToken: constant(uint256) = 0
+DeleteToken: constant(uint256) = 1
+ChangePrice: constant(uint256) = 2
+ChangeCost: constant(uint256) = 3
+ChangeScore: constant(uint256) = 4
+numActions: constant(uint256) = 5
+
+event Act:
+  action: indexed(uint256)
+  actor: indexed(address)
+
+costs: public(uint256[5])
+scores: public(uint256[5])
+
+@internal
+def _act(action: uint256, actor: address):
+  assert action < numActions
+  assert ERC20(self).transferFrom(actor, empty(address), self.costs[action])
+  self.totalSupply -= self.costs[action]
+  self.score[actor] += self.scores[action]
+  self.totalScore += self.scores[action]
+  log Act(action, actor)
+
+@internal
+def _changePrice(_burnToken: ERC20, _priceN: uint256, _priceD: uint256):
+  assert 0 < _priceD, "invalid denominator"
+  self.priceN[_burnToken] = _priceN
+  self.priceD[_burnToken] = _priceD
+
+@external
+def addToken(_burnToken: ERC20, _priceN: uint256, _priceD: uint256):
+  assert not self.burnable[_burnToken], "already added"
+  self._act(AddToken, msg.sender)
+  self.burnable[_burnToken] = True
+  self._changePrice(_burnToken, _priceN, _priceD)
+
+@external
+def deleteToken(_burnToken: ERC20):
+  assert self.burnable[_burnToken], "not added"
+  self._act(DeleteToken, msg.sender)
+  self.burnable[_burnToken] = False
+
+@external
+def changePrice(_burnToken: ERC20, _priceN: uint256, _priceD: uint256):
+  assert self.burnable[_burnToken], "not added"
+  self._act(ChangePrice, msg.sender)
+  self._changePrice(_burnToken, _priceN, _priceD)
+
+@external
+def changeCost(_action: uint256, _cost: uint256):
+  assert _action < numActions
+  self._act(ChangeCost, msg.sender)
+  assert 0 < _cost, "invalid cost"
+  self.costs[_action] = _cost
+
+@external
+def changeScore(_action: uint256, _score: uint256):
+  assert _action < numActions
+  self._act(ChangeScore, msg.sender)
+  self.scores[_action] = _score
