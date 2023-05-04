@@ -75,13 +75,16 @@ priceD: public(HashMap[ERC20, uint256])
 @external
 def mint(_burnToken: ERC20, _value: uint256):
   assert self.burnable[_burnToken], "invalid token"
-  assert _burnToken.transferFrom(msg.sender, self, _value)
+  assert _burnToken.transferFrom(msg.sender, self, _value), "transferFrom"
   amount: uint256 = (_value * self.priceN[_burnToken]) / self.priceD[_burnToken]
   self.totalSupply += amount
   self.balanceOf[empty(address)] = amount
   self._transfer(empty(address), msg.sender, amount)
 
+MAX_RECIPIENTS: constant(uint256) = 2 ** 32
 score: public(HashMap[address, uint256])
+knownActor: public(HashMap[address, bool])
+recipients: public(DynArray[address, MAX_RECIPIENTS])
 totalScore: public(uint256)
 
 SubmitToken: constant(uint256) = 0
@@ -101,8 +104,11 @@ scores: public(uint256[numActions])
 @internal
 def _act(action: uint256, actor: address):
   assert action < numActions
-  assert ERC20(self).transferFrom(actor, empty(address), self.spends[action])
+  assert ERC20(self).transferFrom(actor, empty(address), self.spends[action]), "transferFrom"
   self.totalSupply -= self.spends[action]
+  if not self.knownActor[actor]:
+    self.recipients.append(actor)
+    self.knownActor[actor] = True
   self.score[actor] += self.scores[action]
   self.totalScore += self.scores[action]
   log Act(action, actor)
@@ -145,9 +151,46 @@ def changeScore(_action: uint256, _score: uint256):
   self._act(ChangeScore, msg.sender)
   self.scores[_action] = _score
 
+validSwapAddress: public(HashMap[address, bool])
+swapGuardian: public(address)
+
+@external
+def changeSwapGuardian(_addr: address):
+  assert msg.sender == self.swapGuardian, "auth"
+  self.swapGuardian = _addr
+
+@external
+def setSwapAddress(_addr: address, _allowed: bool):
+  assert msg.sender == self.swapGuardian, "auth"
+  self.validSwapAddress[_addr] = _allowed
+
+MAX_CALLDATA: constant(uint256) = 2 ** 13
+WETH: immutable(ERC20)
+
+@external
+def liquidate(_token: ERC20, _addr: address, _data: Bytes[MAX_CALLDATA]):
+  if _token == WETH:
+    self._distribute()
+    return
+  assert self.validSwapAddress[_addr], "auth"
+  amount: uint256 = _token.balanceOf(self)
+  assert _token.approve(_addr, amount), "approve"
+  raw_call(_addr, _data)
+  assert _token.balanceOf(self) == 0, "leftover"
+  self._distribute()
+
+@internal
+def _distribute():
+  amount: uint256 = WETH.balanceOf(self)
+  for r in self.recipients:
+    self.knownActor[r] = False
+    assert WETH.transfer(r, (amount * self.score[r]) / self.totalScore)
+  self.recipients = empty(DynArray[address, MAX_RECIPIENTS])
+
 @external
 def __init__():
-  WETH: ERC20 = ERC20(0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2)
+  WETH = ERC20(0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2)
+  self.swapGuardian = msg.sender
   self.burnable[WETH] = True
   self.priceN[WETH] = 1000000000
   self.priceD[WETH] = 1
