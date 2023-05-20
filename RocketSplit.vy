@@ -34,17 +34,16 @@ rocketTokenRPLKey: constant(bytes32) = keccak256("contract.addressrocketTokenRPL
 rocketStorage: immutable(RocketStorageInterface)
 RPLToken: immutable(RPLInterface)
 
+guardian: public(address)
+nodeAddress: public(address)
 ETHOwner: public(address)
 RPLOwner: public(address)
-RPLPrincipal: public(uint256)
-ETHPrincipal: public(uint256)
-ETHFee: public(Fee)
-RPLFee: public(Fee)
 pendingETHFee: public(Fee)
 pendingRPLFee: public(Fee)
 pendingWithdrawalAddress: public(address)
-nodeAddress: public(address)
-guardian: public(address)
+ETHFee: public(Fee)
+RPLFee: public(Fee)
+RPLPrincipal: public(uint256)
 
 @external
 def __init__(_rocketStorageAddress: address):
@@ -105,6 +104,18 @@ def confirmRPLFee(_numerator: uint256, _denominator: uint256):
   assert _numerator == self.pendingRPLFee.numerator, "numerator"
   assert _denominator == self.pendingRPLFee.denominator, "denominator"
   self.RPLFee = self.pendingRPLFee
+
+@external
+def setETHFee(_numerator: uint256, _denominator: uint256):
+  assert msg.sender == self.RPLOwner, "auth"
+  self.pendingETHFee = Fee({numerator: _numerator, denominator: _denominator})
+
+@external
+def confirmETHFee(_numerator: uint256, _denominator: uint256):
+  assert msg.sender == self.ETHOwner, "auth"
+  assert _numerator == self.pendingETHFee.numerator, "numerator"
+  assert _denominator == self.pendingETHFee.denominator, "denominator"
+  self.ETHFee = self.pendingETHFee
 
 @external
 def stakeRPL(_amount: uint256):
