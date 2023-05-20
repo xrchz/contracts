@@ -96,7 +96,7 @@ def _getRocketNodeStaking() -> RocketNodeStakingInterface:
 @external
 def setRPLFee(_numerator: uint256, _denominator: uint256):
   assert msg.sender == self.ETHOwner, "auth"
-  assert _denominator != 0 or _numerator == 0, "zero"
+  assert _numerator <= _denominator, "fraction"
   self.pendingRPLFee = Fee({numerator: _numerator, denominator: _denominator})
 
 @external
@@ -109,7 +109,7 @@ def confirmRPLFee(_numerator: uint256, _denominator: uint256):
 @external
 def setETHFee(_numerator: uint256, _denominator: uint256):
   assert msg.sender == self.RPLOwner, "auth"
-  assert _denominator != 0 or _numerator == 0, "zero"
+  assert _numerator <= _denominator, "fraction"
   self.pendingETHFee = Fee({numerator: _numerator, denominator: _denominator})
 
 @external
