@@ -38,6 +38,8 @@ guardian: public(address)
 nodeAddress: public(address)
 ETHOwner: public(address)
 RPLOwner: public(address)
+pendingETHFee: public(Fee)
+pendingRPLFee: public(Fee)
 pendingWithdrawalAddress: public(address)
 ETHFee: public(Fee)
 RPLFee: public(Fee)
@@ -50,12 +52,13 @@ def __init__(_rocketStorageAddress: address):
   self.guardian = msg.sender
 
 @external
-def deploy(_nodeAddress: address,
-           _ETHOwner: address, _RPLOwner: address,
-           _ETHFee: Fee, _RPLFee: Fee) -> address:
+def deploy(_nodeAddress: address, _ETHOwner: address, _RPLOwner: address) -> address:
   assert self.guardian != empty(address), "proxy"
   contract: RocketSplitInterface = RocketSplitInterface(create_minimal_proxy_to(self))
-  contract.setup(_nodeAddress, _ETHOwner, _RPLOwner, _ETHFee, _RPLFee)
+  contract.setGuardian(self)
+  contract.setNodeAddress(_nodeAddress)
+  contract.setETHOwner(_ETHOwner)
+  contract.setRPLOwner(_RPLOwner)
   return contract.address
 
 @external
@@ -64,19 +67,57 @@ def __default__():
   pass
 
 @external
-def setup(_nodeAddress: address, _ETHOwner: address, _RPLOwner: address, _ETHFee: Fee, _RPLFee: Fee):
-  assert self.guardian == empty(address), "auth"
-  self.guardian = msg.sender
-  self.nodeAddress = _nodeAddress
-  self.ETHOwner = _ETHOwner
-  self.RPLOwner = _RPLOwner
-  self.ETHFee = _ETHFee
-  self.RPLFee = _RPLFee
+def setGuardian(_newGuardian: address):
+  assert msg.sender == self.guardian or self.guardian == empty(address), "auth"
+  self.guardian = _newGuardian
+
+@internal
+def _authOrGuardian(_addr: address):
+  assert msg.sender == _addr or (
+    _addr == empty(address) and
+    msg.sender == self.guardian
+  ), "auth"
+
+@external
+def setETHOwner(_newOwner: address):
+  self._authOrGuardian(self.ETHOwner)
+  self.ETHOwner = _newOwner
+
+@external
+def setRPLOwner(_newOwner: address):
+  self._authOrGuardian(self.RPLOwner)
+  self.RPLOwner = _newOwner
 
 @internal
 def _getRocketNodeStaking() -> RocketNodeStakingInterface:
   rocketNodeStakingAddress: address = rocketStorage.getAddress(rocketNodeStakingKey)
   return RocketNodeStakingInterface(rocketNodeStakingAddress)
+
+@external
+def setRPLFee(_numerator: uint256, _denominator: uint256):
+  assert msg.sender == self.ETHOwner, "auth"
+  assert _numerator <= _denominator, "fraction"
+  self.pendingRPLFee = Fee({numerator: _numerator, denominator: _denominator})
+
+@external
+def confirmRPLFee(_numerator: uint256, _denominator: uint256):
+  assert msg.sender == self.RPLOwner, "auth"
+  assert _numerator == self.pendingRPLFee.numerator, "numerator"
+  assert _denominator == self.pendingRPLFee.denominator, "denominator"
+  self.RPLFee = self.pendingRPLFee
+
+@external
+def setETHFee(_numerator: uint256, _denominator: uint256):
+  assert msg.sender == self.RPLOwner, "auth"
+  assert _numerator <= _denominator, "fraction"
+  self.pendingETHFee = Fee({numerator: _numerator, denominator: _denominator})
+
+@external
+def confirmETHFee(_numerator: uint256, _denominator: uint256):
+  assert msg.sender == self.ETHOwner, "auth"
+  assert _numerator == self.pendingETHFee.numerator, "numerator"
+  assert _denominator == self.pendingETHFee.denominator, "denominator"
+  self.ETHFee = self.pendingETHFee
 
 @external
 def stakeRPL(_amount: uint256):
@@ -133,6 +174,11 @@ def confirmWithdrawalAddress():
 def ensSetName(_name: String[256]):
   EnsRevRegInterface(
     EnsRegInterface(ensRegAddress).owner(addrReverseNode)).setName(_name)
+
+@external
+def setNodeAddress(_nodeAddress: address):
+  assert msg.sender == self.guardian, "auth"
+  self.nodeAddress = _nodeAddress
 
 @external
 def changeWithdrawalAddress(_newWithdrawalAddress: address):
