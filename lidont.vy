@@ -39,15 +39,14 @@ interface RocketEther:
 interface StakedEther:
   def transferFrom(_from: address, _to: address, _value: uint256) -> bool: nonpayable
   def approve(_spender: address, _value: uint256) -> bool: nonpayable
+  def balanceOf(_owner: address) -> uint256: view
 
 MAX_REQ: constant(uint256) = 32
 LIDONT_RATIO: constant(uint256) = 10000
 
 interface UnstETH:
-  def requestWithdrawals(_amounts: DynArray[uint256, MAX_REQ], _owner: address) -> DynArray[uint256, MAX_REQ]: nonpayable
+  def requestWithdrawals(_amounts: DynArray[uint256, 1], _owner: address) -> DynArray[uint256, 1]: nonpayable
   def claimWithdrawals(_requestIds: DynArray[uint256, MAX_REQ], _hints: DynArray[uint256, MAX_REQ]): nonpayable
-  def findCheckpointHints(_requestIds: DynArray[uint256, MAX_REQ], _firstIndex: uint256, _lastIndex: uint256) -> DynArray[uint256, MAX_REQ]: view
-  def getLastCheckpointIndex() -> uint256: view
 
 rocketDepositPoolKey: constant(bytes32) = keccak256("contract.addressrocketDepositPool")
 rocketEther: immutable(RocketEther)
@@ -72,13 +71,21 @@ def __init__(_rocketStorageAddress: address):
 
 event Swap:
   who: indexed(address)
-  stakedEther: uint256
-  rocketEther: uint256
+  stakedEther: indexed(uint256)
+  rocketEther: indexed(uint256)
+
+event Mint:
+  amount: indexed(uint256)
+
+event WithdrawalRequest:
+  requestId: indexed(uint256)
+  amount: indexed(uint256)
 
 @internal
 def _mint(amount: uint256):
   self.totalSupply += amount
   self.balanceOf[empty(address)] += amount
+  log Mint(amount)
 
 @internal
 def _transfer(_from: address, _to: address, _amount: uint256) -> bool:
@@ -97,6 +104,7 @@ def transfer(_to: address, _value: uint256) -> bool:
 @external
 def approve(_spender: address, _value: uint256) -> bool:
   self.allowance[msg.sender][_spender] = _value
+  log Approval(msg.sender, _spender, _value)
   return True
 
 @external
@@ -117,3 +125,16 @@ def swap(stETHAmount: uint256):
   lidontAmount: uint256 = stETHAmount * LIDONT_RATIO
   self._mint(lidontAmount)
   self._transfer(empty(address), msg.sender, lidontAmount)
+  log Swap(msg.sender, stETHAmount, rETHAmount)
+
+@external
+def initiateWithdrawal():
+  amount: uint256 = stakedEther.balanceOf(self)
+  assert 0 < amount, "no stETH"
+  assert stakedEther.approve(unstETH.address, amount), "stETH approve failed"
+  requestId: uint256 = unstETH.requestWithdrawals([amount], self)[0]
+  log WithdrawalRequest(requestId, amount)
+
+@external
+def finaliseWithdrawal(_requestIds: DynArray[uint256, MAX_REQ], _hints: DynArray[uint256, MAX_REQ]):
+  unstETH.claimWithdrawals(_requestIds, _hints)
