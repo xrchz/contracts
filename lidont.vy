@@ -62,8 +62,8 @@ balanceOf: public(HashMap[address, uint256])
 allowance: public(HashMap[address, HashMap[address, uint256]])
 
 @external
-def __init__(_rocketStorageAddress: address):
-  rocketStorage = RocketStorage(_rocketStorageAddress)
+def __init__():
+  rocketStorage = RocketStorage(0x1d8f8f00cfa6758d7bE78336684788Fb0ee0Fa46)
   rocketEther = RocketEther(rocketStorage.getAddress(keccak256("contract.addressrocketTokenRETH")))
   oneRETH = 10 ** convert(rocketEther.decimals(), uint256)
   unstETH = UnstETH(0x889edC2eDab5f40e902b864aD4d7AdE8E412F9B1)
