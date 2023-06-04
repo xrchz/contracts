@@ -37,7 +37,6 @@ interface RocketEther:
   def getExchangeRate() -> uint256: view
 
 interface StakedEther:
-  def decimals() -> uint8: view
   def transferFrom(_from: address, _to: address, _value: uint256) -> bool: nonpayable
   def approve(_spender: address, _value: uint256) -> bool: nonpayable
   def balanceOf(_owner: address) -> uint256: view
@@ -52,7 +51,6 @@ interface UnstETH:
 rocketDepositPoolKey: constant(bytes32) = keccak256("contract.addressrocketDepositPool")
 rocketEther: immutable(RocketEther)
 oneRETH: immutable(uint256)
-MIN_WITHDRAW: immutable(uint256)
 unstETH: immutable(UnstETH)
 stakedEther: immutable(StakedEther)
 
@@ -70,7 +68,6 @@ def __init__():
   oneRETH = 10 ** convert(rocketEther.decimals(), uint256)
   unstETH = UnstETH(0x889edC2eDab5f40e902b864aD4d7AdE8E412F9B1)
   stakedEther = StakedEther(0xae7ab96520DE3A18E5e111B5EaAb095312D7fE84)
-  MIN_WITHDRAW = 1 * (10 ** convert(stakedEther.decimals(), uint256))
 
 event Swap:
   who: indexed(address)
@@ -133,7 +130,6 @@ def swap(stETHAmount: uint256):
 @external
 def initiateWithdrawal():
   amount: uint256 = stakedEther.balanceOf(self)
-  assert MIN_WITHDRAW < amount, "not enough stETH"
   assert stakedEther.approve(unstETH.address, amount), "stETH approve failed"
   requestId: uint256 = unstETH.requestWithdrawals([amount], self)[0]
   log WithdrawalRequest(requestId, amount)
