@@ -138,3 +138,8 @@ def initiateWithdrawal():
 @external
 def finaliseWithdrawal(_requestIds: DynArray[uint256, MAX_REQ], _hints: DynArray[uint256, MAX_REQ]):
   unstETH.claimWithdrawals(_requestIds, _hints)
+
+@external
+def deposit():
+  depositPool: RocketDepositPool = RocketDepositPool(rocketStorage.getAddress(rocketDepositPoolKey))
+  depositPool.deposit(value = self.balance)
