@@ -24,36 +24,26 @@ event Approval:
 interface RocketStorage:
   def getAddress(_key: bytes32) -> address: view
 
-rocketStorage: immutable(RocketStorage)
-
 interface RocketDepositPool:
   def deposit(): payable
 
 interface RocketEther:
-  def decimals() -> uint8: view
-  def transfer(_to: address, _value: uint256) -> bool: nonpayable
-  def transferFrom(_from: address, _to: address, _value: uint256) -> bool: nonpayable
-  def balanceOf(_owner: address) -> uint256: view
   def getExchangeRate() -> uint256: view
-
-interface StakedEther:
-  def transfer(_to: address, _value: uint256) -> bool: nonpayable
-  def transferFrom(_from: address, _to: address, _value: uint256) -> bool: nonpayable
-  def approve(_spender: address, _value: uint256) -> bool: nonpayable
-  def balanceOf(_owner: address) -> uint256: view
-
-MAX_REQ: constant(uint256) = 32
-LIDONT_RATIO: constant(uint256) = 10000
 
 interface UnstETH:
   def requestWithdrawals(_amounts: DynArray[uint256, 1], _owner: address) -> DynArray[uint256, 1]: nonpayable
   def claimWithdrawals(_requestIds: DynArray[uint256, MAX_REQ], _hints: DynArray[uint256, MAX_REQ]): nonpayable
 
+rocketStorage: immutable(RocketStorage)
+
+MAX_REQ: constant(uint256) = 32
+LIDONT_RATIO: constant(uint256) = 10000
+
 rocketDepositPoolKey: constant(bytes32) = keccak256("contract.addressrocketDepositPool")
 rocketEther: immutable(RocketEther)
 oneRETH: immutable(uint256)
 unstETH: immutable(UnstETH)
-stakedEther: immutable(StakedEther)
+stakedEther: immutable(ERC20)
 
 owner: public(address)
 name: public(constant(String[64])) = "Lidont Staked to Rocket Ether Ratchet"
@@ -67,9 +57,9 @@ allowance: public(HashMap[address, HashMap[address, uint256]])
 def __init__():
   rocketStorage = RocketStorage(0x1d8f8f00cfa6758d7bE78336684788Fb0ee0Fa46)
   rocketEther = RocketEther(rocketStorage.getAddress(keccak256("contract.addressrocketTokenRETH")))
-  oneRETH = 10 ** convert(rocketEther.decimals(), uint256)
+  oneRETH = 10 ** convert(ERC20(rocketEther.address).decimals(), uint256)
   unstETH = UnstETH(0x889edC2eDab5f40e902b864aD4d7AdE8E412F9B1)
-  stakedEther = StakedEther(0xae7ab96520DE3A18E5e111B5EaAb095312D7fE84)
+  stakedEther = ERC20(0xae7ab96520DE3A18E5e111B5EaAb095312D7fE84)
   self.owner = msg.sender
 
 @external
@@ -81,7 +71,7 @@ def changeOwner(_newOwner: address):
 def drain():
   assert msg.sender == self.owner, "auth"
   assert stakedEther.transfer(msg.sender, stakedEther.balanceOf(self))
-  assert rocketEther.transfer(msg.sender, rocketEther.balanceOf(self))
+  assert ERC20(rocketEther.address).transfer(msg.sender, ERC20(rocketEther.address).balanceOf(self))
   send(msg.sender, self.balance)
 
 event Swap:
@@ -136,7 +126,7 @@ def transferFrom(_from: address, _to: address, _value: uint256) -> bool:
 def swap(stETHAmount: uint256):
   rETHAmount: uint256 = (stETHAmount * rocketEther.getExchangeRate()) / oneRETH
   assert stakedEther.transferFrom(msg.sender, self, stETHAmount), "stETH transfer failed"
-  assert rocketEther.transfer(msg.sender, rETHAmount), "rETH transfer failed"
+  assert ERC20(rocketEther.address).transfer(msg.sender, rETHAmount), "rETH transfer failed"
   lidontAmount: uint256 = stETHAmount * LIDONT_RATIO
   self._mint(lidontAmount)
   self._transfer(empty(address), msg.sender, lidontAmount)
