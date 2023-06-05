@@ -37,6 +37,7 @@ interface RocketEther:
   def getExchangeRate() -> uint256: view
 
 interface StakedEther:
+  def transfer(_to: address, _value: uint256) -> bool: nonpayable
   def transferFrom(_from: address, _to: address, _value: uint256) -> bool: nonpayable
   def approve(_spender: address, _value: uint256) -> bool: nonpayable
   def balanceOf(_owner: address) -> uint256: view
@@ -54,6 +55,7 @@ oneRETH: immutable(uint256)
 unstETH: immutable(UnstETH)
 stakedEther: immutable(StakedEther)
 
+owner: public(address)
 name: public(constant(String[64])) = "Lidont Staked to Rocket Ether Ratchet"
 symbol: public(constant(String[8])) = "LIDONT"
 decimals: public(constant(uint8)) = 18
@@ -68,6 +70,19 @@ def __init__():
   oneRETH = 10 ** convert(rocketEther.decimals(), uint256)
   unstETH = UnstETH(0x889edC2eDab5f40e902b864aD4d7AdE8E412F9B1)
   stakedEther = StakedEther(0xae7ab96520DE3A18E5e111B5EaAb095312D7fE84)
+  self.owner = msg.sender
+
+@external
+def changeOwner(_newOwner: address):
+  assert msg.sender == self.owner, "auth"
+  self.owner = _newOwner
+
+@external
+def drain():
+  assert msg.sender == self.owner, "auth"
+  assert stakedEther.transfer(msg.sender, stakedEther.balanceOf(self))
+  assert rocketEther.transfer(msg.sender, rocketEther.balanceOf(self))
+  send(msg.sender, self.balance)
 
 event Swap:
   who: indexed(address)
