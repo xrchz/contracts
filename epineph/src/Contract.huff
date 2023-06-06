@@ -31,6 +31,7 @@
     __FUNC_SIG("transfer(address,uint256)") push0 mstore
     0x20 push0 // store result of transfer at 0x00
     0x44 0x1c // function signature + two arguments
+    push0 [rETH] gas call
     iszero fail jumpi
     callvalue 0x20 mstore // store ETH at 0x20
     caller __EVENT_HASH(Deposit)
