@@ -8,6 +8,8 @@ import "forge-std/console.sol";
 contract ContractTest is Test {
     Contract public c;
     event Deposit(address indexed, uint256, uint256, uint256);
+    event Transfer(address indexed, address indexed, uint256);
+    address rETHAddress = 0xae78736Cd615f374D3085123A210448E74Fc6393;
 
     function setUp() public {
         c = Contract(HuffDeployer.deploy("Contract"));
@@ -19,6 +21,8 @@ contract ContractTest is Test {
     }
 
     function testEmptyDeposit() public {
+        vm.expectEmit(true, true, true, true, rETHAddress);
+        emit Transfer(address(c), address(this), 0);
         vm.expectEmit(true, true, true, true, address(c));
         emit Deposit(address(this), 0, 0, 0);
         c.deposit(0);
