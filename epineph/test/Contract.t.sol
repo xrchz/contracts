@@ -3,7 +3,6 @@ pragma solidity ^0.8.15;
 
 import "foundry-huff/HuffDeployer.sol";
 import "forge-std/Test.sol";
-import "forge-std/console.sol";
 
 contract ContractTest is Test {
     Contract public c;
@@ -13,6 +12,7 @@ contract ContractTest is Test {
     address stETHAddress = 0xae7ab96520DE3A18E5e111B5EaAb095312D7fE84;
 
     function setUp() public {
+        vm.createSelectFork(vm.envString("MAINNET_RPC_URL"));
         c = Contract(HuffDeployer.deploy("Contract"));
     }
 
