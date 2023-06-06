@@ -1,0 +1,69 @@
+#define function deposit(uint256) payable returns ()
+#define function drain() nonpayable returns ()
+#define event Deposit(address indexed, uint256, uint256, uint256) // ETH, rETH, stETH
+#define event Drain(address indexed, uint256, uint256) // ETH, stETH
+
+#define constant rETH  = 0xae78736Cd615f374D3085123A210448E74Fc6393
+#define constant stETH = 0xae7ab96520DE3A18E5e111B5EaAb095312D7fE84
+#define constant OWNER = 0x0000000000000000000000000000000000000000 // TODO
+#define constant MAX   = 0xde0b6b3a7640000 // 1 ETH
+
+#define macro DEPOSIT() = takes (0) returns (0) {
+    0x04 calldataload
+    iszero next jumpi
+    __FUNC_SIG("transferFrom(address,address,uint256)") 0x00 mstore
+    caller 0x20 mstore address 0x40 mstore 0x20 0x04 0x60 calldatacopy
+    0x20 0x00 // store result of transferFrom at 0x00
+    0x64 0x1c // function signature + three arguments
+    0x00 [stETH] gas call
+    0x00 mload and // require no revert & return of true
+    next jumpi
+    fail:
+    0x00 0x00 revert
+    next: // stETH at 0x60
+    callvalue 0x60 mload add // total (ETH + stETH)
+    dup1 0x40 mstore // total at 0x40 and top of stack
+    [MAX] lt fail jumpi // ensure !(MAX < total)
+    __FUNC_SIG("getRethValue(uint256)") 0x20 mstore
+    0x20 0x40 // store rETH at 0x40
+    0x24 0x3c // function signature (at 0x20) + one argument
+    0x00 [rETH] gas call
+    iszero fail jumpi
+    caller 0x20 mstore
+    __FUNC_SIG("transfer(address,uint256)") 0x00 mstore
+    0x20 0x00 // store result of transfer at 0x00
+    0x44 0x1c // function signature + two arguments
+    iszero fail jumpi
+    callvalue 0x20 mstore // store ETH at 0x20
+    caller __EVENT_HASH(Deposit)
+    0x60 0x20 log2
+    0x00 0x00 return
+}
+
+#define macro DUMPSTER() = takes (0) returns (0) {
+    __FUNC_SIG("balanceOf(address)") 0x00 mstore address 0x20 mstore
+    0x20 0x40 // store self's stETH balance at 0x40
+    0x24 0x1c
+    0x00 [stETH] gas call
+    pop // assume success
+    __FUNC_SIG("transfer(address,uint256)") 0x00 mstore [OWNER] 0x20 mstore
+    0x20 0x00 // store result of transfer at 0x00
+    0x44 0x1c // function signature + two arguments
+    0x00 [stETH] gas call
+    0x00 mload and // require no revert & return of true
+    here jumpi
+    0x00 0x00 revert
+    here:
+    selfbalance 0x20 mstore // store self's ETH balance at 0x20
+    0x00 0x00 0x00 0x00 0x20 mload [OWNER] 0x00 call // send balance to owner
+    caller __EVENT_HASH(Drain)
+    0x40 0x20 // 2 words: ETH balance (at 0x20) and stETH balance (at 0x40)
+    log2
+    0x00 0x00 return
+}
+
+#define macro MAIN() = takes (0) returns (0) {
+    0x00 calldataload 0xe0 shr
+    dup1 __FUNC_SIG(drain) eq into jumpi
+    DEPOSIT() into: DUMPSTER()
+}
