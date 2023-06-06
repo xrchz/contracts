@@ -9,15 +9,15 @@
 #define macro DEPOSIT() = takes (0) returns (0) {
     0x04 calldataload
     iszero next jumpi
-    __FUNC_SIG("transferFrom(address,address,uint256)") 0x00 mstore
+    __FUNC_SIG("transferFrom(address,address,uint256)") push0 mstore
     caller 0x20 mstore address 0x40 mstore 0x20 0x04 0x60 calldatacopy
-    0x20 0x00 // store result of transferFrom at 0x00
+    0x20 push0 // store result of transferFrom at 0x00
     0x64 0x1c // function signature + three arguments
-    0x00 [stETH] gas call
-    0x00 mload and // require no revert & return of true
+    push0 [stETH] gas call
+    push0 mload and // require no revert & return of true
     next jumpi
     fail:
-    0x00 0x00 revert
+    push0 push0 revert
     next: // stETH at 0x60
     callvalue 0x60 mload add // total (ETH + stETH)
     dup1 0x40 mstore // total at 0x40 and top of stack
@@ -25,43 +25,43 @@
     __FUNC_SIG("getRethValue(uint256)") 0x20 mstore
     0x20 0x40 // store rETH at 0x40
     0x24 0x3c // function signature (at 0x20) + one argument
-    0x00 [rETH] gas call
+    push0 [rETH] gas call
     iszero fail jumpi
     caller 0x20 mstore
-    __FUNC_SIG("transfer(address,uint256)") 0x00 mstore
-    0x20 0x00 // store result of transfer at 0x00
+    __FUNC_SIG("transfer(address,uint256)") push0 mstore
+    0x20 push0 // store result of transfer at 0x00
     0x44 0x1c // function signature + two arguments
     iszero fail jumpi
     callvalue 0x20 mstore // store ETH at 0x20
     caller __EVENT_HASH(Deposit)
     0x60 0x20 log2
-    0x00 0x00 return
+    push0 push0 return
 }
 
 #define macro DUMPSTER() = takes (0) returns (0) {
-    __FUNC_SIG("balanceOf(address)") 0x00 mstore address 0x20 mstore
+    __FUNC_SIG("balanceOf(address)") push0 mstore address 0x20 mstore
     0x20 0x40 // store self's stETH balance at 0x40
     0x24 0x1c
-    0x00 [stETH] gas call
+    push0 [stETH] gas call
     pop // assume success
-    __FUNC_SIG("transfer(address,uint256)") 0x00 mstore [OWNER] 0x20 mstore
-    0x20 0x00 // store result of transfer at 0x00
+    __FUNC_SIG("transfer(address,uint256)") push0 mstore [OWNER] 0x20 mstore
+    0x20 push0 // store result of transfer at 0x00
     0x44 0x1c // function signature + two arguments
-    0x00 [stETH] gas call
-    0x00 mload and // require no revert & return of true
+    push0 [stETH] gas call
+    push0 mload and // require no revert & return of true
     here jumpi
-    0x00 0x00 revert
+    push0 push0 revert
     here:
     selfbalance 0x20 mstore // store self's ETH balance at 0x20
-    0x00 0x00 0x00 0x00 0x20 mload [OWNER] 0x00 call // send balance to owner
+    push0 push0 push0 push0 0x20 mload [OWNER] push0 call // send balance to owner
     caller __EVENT_HASH(Drain)
     0x40 0x20 // 2 words: ETH balance (at 0x20) and stETH balance (at 0x40)
     log2
-    0x00 0x00 return
+    push0 push0 return
 }
 
 #define macro MAIN() = takes (0) returns (0) {
-    0x00 calldataload 0xe0 shr
+    push0 calldataload 0xe0 shr
     __FUNC_SIG("drain()") eq into jumpi
     DEPOSIT() into: DUMPSTER()
 }
