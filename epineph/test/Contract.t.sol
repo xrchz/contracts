@@ -39,6 +39,30 @@ contract ContractTest is Test {
         vm.stopPrank();
     }
 
+    function testDepositNoReth() public {
+        // pretend to be wstETH (which has a lot of stETH) since deal seems to break on lido
+        address wstETH = 0x7f39C581F595B53c5cb19bD0b3f8dA6c935E2Ca0;
+        vm.startPrank(wstETH);
+        ERC20(stETHAddress).approve(address(c), 24);
+        vm.expectRevert();
+        c.deposit(12);
+        vm.stopPrank();
+    }
+
+    function testDepositTooMuch() public {
+        deal(rETHAddress, address(c), 20 ether); // give contract enough rETH
+        vm.expectRevert();
+        c.deposit{value: 1 ether + 1}(0);
+    }
+
+    function testDepositExactly1() public {
+        deal(rETHAddress, address(c), 20 ether); // give contract enough rETH
+        uint256 expected = rETH(rETHAddress).getRethValue(1 ether);
+        vm.expectEmit(true, true, true, true, address(c));
+        emit Deposit(address(this), 1 ether, expected, 0);
+        c.deposit{value: 1 ether}(0);
+    }
+
     function testEmptyDeposit() public {
         vm.expectEmit(true, true, true, true, rETHAddress);
         emit Transfer(address(c), address(this), 0);
