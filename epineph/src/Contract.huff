@@ -3,7 +3,7 @@
 
 #define constant rETH  = 0xae78736Cd615f374D3085123A210448E74Fc6393
 #define constant stETH = 0xae7ab96520DE3A18E5e111B5EaAb095312D7fE84
-#define constant OWNER = 0x0000000000000000000000000000000000000000 // TODO
+#define constant OWNER = 0x1234567890000000000000000000000000000000 // TODO
 #define constant MAX   = 0xde0b6b3a7640000 // 1 ETH
 
 #define macro DEPOSIT() = takes (0) returns (0) {
