@@ -1,5 +1,7 @@
-#define event Deposit(address indexed, uint256, uint256, uint256) // ETH, rETH, stETH
-#define event Drain(address indexed, uint256, uint256) // ETH, stETH
+#define event Deposit(address indexed sender, uint256 ETH, uint256 rETH, uint256 stETH)
+#define event Drain(address indexed sender, uint256 ETH, uint256 stETH)
+#define function deposit(uint256 stETH) payable returns ()
+#define function drain() nonpayable returns ()
 
 #define constant rETH  = 0xae78736Cd615f374D3085123A210448E74Fc6393
 #define constant stETH = 0xae7ab96520DE3A18E5e111B5EaAb095312D7fE84

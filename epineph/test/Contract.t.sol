@@ -6,9 +6,9 @@ import "forge-std/Test.sol";
 
 contract ContractTest is Test {
     Contract public c;
-    event Transfer(address indexed, address indexed, uint256);
-    event Deposit(address indexed, uint256, uint256, uint256);
-    event Drain(address indexed, uint256, uint256);
+    event Transfer(address indexed from, address indexed to, uint256 value);
+    event Deposit(address indexed sender, uint256 ETH, uint256 rETH, uint256 stETH);
+    event Drain(address indexed sender, uint256 ETH, uint256 stETH);
     address rETHAddress = 0xae78736Cd615f374D3085123A210448E74Fc6393;
     address stETHAddress = 0xae7ab96520DE3A18E5e111B5EaAb095312D7fE84;
     address ownerAddress = 0x1234567890000000000000000000000000000000;
@@ -83,7 +83,7 @@ contract ContractTest is Test {
 }
 
 interface Contract {
-    function deposit(uint256) payable external;
+    function deposit(uint256 stETH) payable external;
     function drain() external;
 }
 
