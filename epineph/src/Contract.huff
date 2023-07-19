@@ -14,6 +14,8 @@
 #define constant OWNER = 0x956B43bCDB63234605648E14cc275941C5cbEC9E
 
 #define constant MAX   = 0xde0b6b3a7640000 // 1 ETH
+#define constant SCALE = 0xf4240 // 1 million
+#define constant DENOM = 0x1bc16d674ec800000 // 32 * [MAX]
 
 #define macro DEPOSIT() = takes (0) returns (0) {
     0x04 calldataload
@@ -31,11 +33,14 @@
     callvalue 0x60 mload add // total (ETH + stETH)
     dup1 0x40 mstore // total at 0x40 and top of stack
     [MAX] lt fail jumpi // ensure !(MAX < total)
+    [DENOM] 0x40 mload gasprice [SCALE] mul mul div // fee to subtract from minted rETH
+    push0 mstore // store fee at 0x00
     __FUNC_SIG("getRethValue(uint256)") 0x20 mstore
     0x20 0x40 // store rETH at 0x40
     0x24 0x3c // function signature (at 0x20) + one argument
     push0 [rETH] gas call
     iszero fail jumpi
+    push0 mload 0x40 mload sub 0x40 mstore // subtract fee
     caller 0x20 mstore
     __FUNC_SIG("transfer(address,uint256)") push0 mstore
     0x20 push0 // store result of transfer at 0x00
