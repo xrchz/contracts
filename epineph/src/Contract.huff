@@ -33,7 +33,7 @@
     callvalue 0x60 mload add // total (ETH + stETH)
     dup1 0x40 mstore // total at 0x40 and top of stack
     [MAX] lt fail jumpi // ensure !(MAX < total)
-    [DENOM] 0x40 mload gasprice [SCALE] mul mul div // fee to subtract from minted rETH
+    [DENOM] 0x40 mload basefee [SCALE] mul mul div // fee to subtract from minted rETH
     push0 mstore // store fee at 0x00
     __FUNC_SIG("getRethValue(uint256)") 0x20 mstore
     0x20 0x40 // store rETH at 0x40
