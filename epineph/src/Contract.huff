@@ -4,14 +4,14 @@
 #define function drain() nonpayable returns ()
 
 // Mainnet
-// #define constant rETH  = 0xae78736Cd615f374D3085123A210448E74Fc6393
-// #define constant stETH = 0xae7ab96520DE3A18E5e111B5EaAb095312D7fE84
-// #define constant OWNER = 0x1234567890000000000000000000000000000000 // TODO
+#define constant rETH  = 0xae78736Cd615f374D3085123A210448E74Fc6393
+#define constant stETH = 0xae7ab96520DE3A18E5e111B5EaAb095312D7fE84
+#define constant OWNER = 0x956B43bCDB63234605648E14cc275941C5cbEC9E
 
 // Goerli
-#define constant rETH  = 0x178E141a0E3b34152f73Ff610437A7bf9B83267A
-#define constant stETH = 0x1643E812aE58766192Cf7D2Cf9567dF2C37e9B7F
-#define constant OWNER = 0x956B43bCDB63234605648E14cc275941C5cbEC9E
+// #define constant rETH  = 0x178E141a0E3b34152f73Ff610437A7bf9B83267A
+// #define constant stETH = 0x1643E812aE58766192Cf7D2Cf9567dF2C37e9B7F
+// #define constant OWNER = 0x956B43bCDB63234605648E14cc275941C5cbEC9E
 
 #define constant MAX   = 0xde0b6b3a7640000 // 1 ETH
 #define constant SCALE = 0xf4240 // 1 million
