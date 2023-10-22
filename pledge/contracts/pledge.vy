@@ -76,7 +76,7 @@ totalPledged: public(HashMap[uint256, uint256])
 # total amount of buyToken bought for sellToken (0 if not executed)
 totalBought: public(HashMap[uint256, uint256])
 
-# total for which the buyToken has been paid out, out of the total pledged
+# total of the bought buyToken that has been paid out
 totalClaimed: public(HashMap[uint256, uint256])
 
 # pledgers who have not yet claimed or refunded
@@ -108,6 +108,11 @@ event Claim:
   pledger: indexed(address)
   buyAmount: indexed(uint256)
   sellAmount: uint256
+
+event Dust:
+  pledgeId: indexed(uint256)
+  duster: indexed(address)
+  amount: indexed(uint256)
 
 event Refund:
   pledgeId: indexed(uint256)
@@ -198,11 +203,29 @@ def claim(id: uint256):
   })])
   assert pledge.buyToken.transfer(msg.sender, buyAmount), "transfer"
   self.pledged[id][msg.sender] = 0
-  self.totalClaimed[id] += sellAmount
+  self.totalClaimed[id] += buyAmount
   self.activePledgers[id] -= 1
   log Claim(id, msg.sender, buyAmount, sellAmount)
 
-# TODO: add claimer for rounding dust
+@external
+def dust(id: uint256):
+  assert id < self.numPledges, "id"
+  pledge: PledgeInfo = self.pledges[id]
+  assert pledge.deadline < block.timestamp, "active"
+  assert 0 < self.totalBought[id], "pending"
+  assert self.activePledgers[id] == 0, "claimants"
+  buyAmount: uint256 = self.totalBought[id] - self.totalClaimed[id]
+  assert 0 < buyAmount, "empty"
+  vault.manageUserBalance([UserBalanceOp({
+    kind: UserBalanceOpKind.WITHDRAW_INTERNAL,
+    asset: pledge.buyToken.address,
+    amount: buyAmount,
+    sender: self,
+    recipient: self
+  })])
+  assert pledge.buyToken.transfer(msg.sender, buyAmount), "transfer"
+  self.totalClaimed[id] += buyAmount
+  log Dust(id, msg.sender, buyAmount)
 
 @external
 def refund(id: uint256):
