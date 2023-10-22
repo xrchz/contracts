@@ -9,6 +9,7 @@
 
 interface ERC20:
   def balanceOf(_who: address) -> uint256: view
+  def transfer(_to: address, _amount: uint256) -> bool: nonpayable
   def transferFrom(_from: address, _to: address, _amount: uint256) -> bool: nonpayable
 
 enum SwapKind:
@@ -32,8 +33,9 @@ struct FundManagement:
 interface BalancerVault:
   def swap(singleSwap: SingleSwap, funds: FundManagement, limit: uint256, deadline: uint256) -> uint256: payable
 
+vault: immutable(BalancerVault)
+
 struct Pledge:
-  owner: address      # owner (initially creator) of the pledge
   deadline: uint256   # timestamp by which the pledge must be executed, else it will be refunded
   buyToken: ERC20     # pledging to buy this token
   minPledges: uint256 # pledge succeeds only if at least this number of pledges are made
@@ -47,20 +49,12 @@ numPledges: uint256
 
 pledged: HashMap[address, HashMap[uint256, uint256]]
 
-owner: address
-
 @external
 def __init__():
-  self.owner = msg.sender
-
-@external
-def setOwner(newOwner: address):
-  assert msg.sender == self.owner, "auth"
-  self.owner = newOwner
+  vault = BalancerVault(0xBA12222222228d8Ba445958a75a0704d566BF2C8)
 
 @external
 def createPledge(pledge: Pledge):
-  assert pledge.owner == msg.sender, "auth"
   assert block.timestamp < pledge.deadline, "deadline must be in future"
   # TODO: assert Balancer pool exists for this pair?
   self.pledges[self.numPledges] = pledge
@@ -73,4 +67,24 @@ def pledge(id: uint256, amount: uint256):
   assert block.timestamp < pledge.deadline, "expired"
   assert pledge.sellToken.transferFrom(msg.sender, self, amount), "transferFrom"
   self.pledged[msg.sender][id] += amount
+  # TODO: emit log
+
+@external
+def execute(id: uint256):
+  assert id < self.numPledges, "id"
+  pledge: Pledge = self.pledges[id]
+  assert block.timestamp < pledge.deadline, "expired"
+  # TODO: find all the pledgers - or take them as arguments? or just store total?
+  # TODO: do the swap
+  # TODO: mark the pledgers as spent - or just store spent?
+  # TODO: emit log
+
+@external
+def refund(id: uint256):
+  assert id < self.numPledges, "id"
+  pledge: Pledge = self.pledges[id]
+  assert pledge.deadline < block.timestamp, "active"
+  amount: uint256 = self.pledged[msg.sender][id]
+  assert 0 < amount, "empty"
+  assert pledge.sellToken.transfer(msg.sender, amount), "transfer"
   # TODO: emit log
