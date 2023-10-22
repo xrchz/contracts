@@ -56,10 +56,9 @@ interface BalancerVault:
     uint256): view
   def manageUserBalance(ops: DynArray[UserBalanceOp, 1]): nonpayable
 
-
 vault: immutable(BalancerVault)
 
-struct Pledge:
+struct PledgeInfo:
   poolId: bytes32
   deadline: uint256 # timestamp by which the pledge must be executed, else it will be refunded
   buyToken: ERC20   # pledging to buy this token
@@ -68,19 +67,52 @@ struct Pledge:
   maxSellForMin: uint256 # of buyToken is no more than maxSellForMin of sellToken
 
 # Pledges with a numeric ID (ever-increasing nonce)
-pledges: HashMap[uint256, Pledge]
-numPledges: uint256
-
-# whether the pledge has been executed (i.e. sellToken sold for buyToken)
-executed: HashMap[uint256, bool]
+pledges: public(HashMap[uint256, PledgeInfo])
+numPledges: public(uint256)
 
 # total amount pledged (including refunded or sold) per pledge
-# total amount of sellToken pledged for which buy token has been paid out
-totalPledged: HashMap[uint256, uint256]
-totalPaidFor: HashMap[uint256, uint256]
+totalPledged: public(HashMap[uint256, uint256])
 
-# amount pledged (and not refunded) per user, per pledge id
-pledged: HashMap[address, HashMap[uint256, uint256]]
+# total amount of buyToken bought for sellToken (0 if not executed)
+totalBought: public(HashMap[uint256, uint256])
+
+# total for which the buyToken has been paid out, out of the total pledged
+totalClaimed: public(HashMap[uint256, uint256])
+
+# pledgers who have not yet claimed or refunded
+activePledgers: public(HashMap[uint256, uint256])
+
+# amount pledged (and not refunded or sold) per user per pledge id
+pledged: public(HashMap[uint256, HashMap[address, uint256]])
+
+event Create:
+  pledgeId: indexed(uint256)
+  buyToken: indexed(address)
+  sellToken: indexed(address)
+  minBuy: uint256
+  maxSellForMin: uint256
+  deadline: uint256
+
+event Pledge:
+  pledgeId: indexed(uint256)
+  pledger: indexed(address)
+  amount: indexed(uint256)
+
+event Execute:
+  pledgeId: indexed(uint256)
+  sellAmount: indexed(uint256)
+  buyAmount: indexed(uint256)
+
+event Claim:
+  pledgeId: indexed(uint256)
+  pledger: indexed(address)
+  buyAmount: indexed(uint256)
+  sellAmount: uint256
+
+event Refund:
+  pledgeId: indexed(uint256)
+  pledger: indexed(address)
+  amount: indexed(uint256)
 
 @external
 def __init__():
@@ -93,20 +125,27 @@ def __init__():
   })
 
 @external
-def create(pledge: Pledge, buyTokenIndex: uint256, sellTokenIndex: uint256):
+def create(pledge: PledgeInfo, buyTokenIndex: uint256, sellTokenIndex: uint256):
   assert block.timestamp < pledge.deadline, "deadline must be in future"
+  assert 0 < pledge.minBuy, "minBuy"
   tokens: DynArray[ERC20, MAX_TOKENS_PER_POOL] = vault.getPoolTokens(pledge.poolId)[0]
   assert tokens[buyTokenIndex] == pledge.buyToken, "buyToken"
   assert tokens[sellTokenIndex] == pledge.sellToken, "sellToken"
   self.pledges[self.numPledges] = pledge
+  log Create(
+    self.numPledges,
+    pledge.buyToken.address,
+    pledge.sellToken.address,
+    pledge.minBuy,
+    pledge.maxSellForMin,
+    pledge.deadline)
   self.numPledges += 1
-  # TODO: emit log
 
 @external
 def pledge(id: uint256, amount: uint256):
-  pledge: Pledge = self.pledges[id]
+  pledge: PledgeInfo = self.pledges[id]
   assert block.timestamp < pledge.deadline, "expired"
-  assert not self.executed[id], "executed"
+  assert self.totalBought[id] == 0, "executed"
   assert pledge.sellToken.transferFrom(msg.sender, self, amount), "transferFrom"
   assert pledge.sellToken.approve(vault.address, amount), "approve"
   vault.manageUserBalance([UserBalanceOp({
@@ -116,16 +155,17 @@ def pledge(id: uint256, amount: uint256):
     sender: self,
     recipient: self
   })])
-  self.pledged[msg.sender][id] += amount
+  self.pledged[id][msg.sender] += amount
   self.totalPledged[id] += amount
-  # TODO: emit log
+  self.activePledgers[id] += 1
+  log Pledge(id, msg.sender, amount)
 
 @external
 def execute(id: uint256):
   assert id < self.numPledges, "id"
-  pledge: Pledge = self.pledges[id]
+  pledge: PledgeInfo = self.pledges[id]
   assert block.timestamp < pledge.deadline, "expired"
-  assert not self.executed[id], "executed"
+  assert self.totalBought[id] == 0, "executed"
   sellAmount: uint256 = self.totalPledged[id]
   swap: SingleSwap = SingleSwap({
     poolId: pledge.poolId,
@@ -135,30 +175,42 @@ def execute(id: uint256):
     amount: sellAmount,
     userData: b''})
   limit: uint256 = sellAmount / pledge.maxSellForMin * pledge.minBuy
-  amountOut: uint256 = vault.swap(swap, selfFunds, limit, block.timestamp)
-  assert amountOut > pledge.minBuy, "minBuy"
-  assert amountOut / pledge.minBuy * pledge.maxSellForMin <= sellAmount, "price"
-  self.executed[id] = True
-  # TODO: emit log
+  buyAmount: uint256 = vault.swap(swap, selfFunds, limit, block.timestamp)
+  assert buyAmount >= pledge.minBuy, "minBuy"
+  assert buyAmount / pledge.minBuy * pledge.maxSellForMin <= sellAmount, "price"
+  self.totalBought[id] = buyAmount
+  log Execute(id, sellAmount, buyAmount)
 
 @external
 def claim(id: uint256):
   assert id < self.numPledges, "id"
-  pledge: Pledge = self.pledges[id]
-  assert self.executed[id], "pending"
-  # TODO: transfer buy token to sender
-  # TODO: increment total paid for
-  # TODO: emit log
+  pledge: PledgeInfo = self.pledges[id]
+  assert 0 < self.totalBought[id], "pending"
+  sellAmount: uint256 = self.pledged[id][msg.sender]
+  assert 0 < sellAmount, "empty"
+  buyAmount: uint256 = sellAmount * self.totalBought[id] / self.totalPledged[id]
+  vault.manageUserBalance([UserBalanceOp({
+    kind: UserBalanceOpKind.WITHDRAW_INTERNAL,
+    asset: pledge.buyToken.address,
+    amount: buyAmount,
+    sender: self,
+    recipient: self
+  })])
+  assert pledge.buyToken.transfer(msg.sender, buyAmount), "transfer"
+  self.pledged[id][msg.sender] = 0
+  self.totalClaimed[id] += sellAmount
+  self.activePledgers[id] -= 1
+  log Claim(id, msg.sender, buyAmount, sellAmount)
 
 # TODO: add claimer for rounding dust
 
 @external
 def refund(id: uint256):
   assert id < self.numPledges, "id"
-  pledge: Pledge = self.pledges[id]
+  pledge: PledgeInfo = self.pledges[id]
   assert pledge.deadline < block.timestamp, "active"
-  assert not self.executed[id], "executed"
-  amount: uint256 = self.pledged[msg.sender][id]
+  assert self.totalBought[id] == 0, "executed"
+  amount: uint256 = self.pledged[id][msg.sender]
   assert 0 < amount, "empty"
   vault.manageUserBalance([UserBalanceOp({
     kind: UserBalanceOpKind.WITHDRAW_INTERNAL,
@@ -168,5 +220,6 @@ def refund(id: uint256):
     recipient: self
   })])
   assert pledge.sellToken.transfer(msg.sender, amount), "transfer"
-  self.pledged[msg.sender][id] = 0
-  # TODO: emit log
+  self.pledged[id][msg.sender] = 0
+  self.activePledgers[id] -= 1
+  log Refund(id, msg.sender, amount)
