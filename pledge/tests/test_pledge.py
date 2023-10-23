@@ -57,14 +57,32 @@ def test_add_pledge_unapproved(pledgeContract, createdPledge, rETHHolder):
     with reverts('ERC20: transfer amount exceeds allowance'):
         pledgeContract.pledge(createdPledge, '42 gwei', sender=rETHHolder)
 
-def test_add_pledge(pledgeContract, createdPledge, rETHHolder):
+@pytest.fixture
+def addPledge(pledgeContract, createdPledge, rETHHolder):
     rETH = Contract(RETH_ADDRESS)
     amount = to_wei(42, 'gwei')
-    rETH.approve(pledgeContract.address, amount, sender=rETHHolder)
     prevBalance = rETH.balanceOf(rETHHolder)
+    rETH.approve(pledgeContract.address, amount, sender=rETHHolder)
     pledgeContract.pledge(createdPledge, amount, sender=rETHHolder)
+    return {'amount': amount, 'rETH': rETH, 'prevBalance': prevBalance}
+
+def test_add_pledge(pledgeContract, createdPledge, addPledge, rETHHolder):
+    rETH = addPledge['rETH']
+    amount = addPledge['amount']
     assert pledgeContract.totalPledged(createdPledge) == amount
     assert pledgeContract.activePledgers(createdPledge) == 1
     assert pledgeContract.pledged(createdPledge, rETHHolder) == amount
     assert rETH.balanceOf(pledgeContract) == 0
-    assert rETH.balanceOf(rETHHolder) == prevBalance - amount
+    assert rETH.balanceOf(rETHHolder) == addPledge['prevBalance'] - amount
+
+def test_refund_before_deadline(pledgeContract, createdPledge, addPledge, rETHHolder):
+    with reverts('active'):
+        pledgeContract.refund(createdPledge, sender=rETHHolder)
+
+def test_claim_before_bought(pledgeContract, createdPledge, addPledge, rETHHolder):
+    with reverts('pending'):
+        pledgeContract.claim(createdPledge, sender=rETHHolder)
+
+def test_dust_before_deadline(pledgeContract, createdPledge, addPledge, rETHHolder):
+    with reverts('active'):
+        pledgeContract.dust(createdPledge, sender=rETHHolder)
