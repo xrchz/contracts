@@ -13,13 +13,11 @@ interface ERC20:
   def transfer(_to: address, _amount: uint256) -> bool: nonpayable
   def transferFrom(_from: address, _to: address, _amount: uint256) -> bool: nonpayable
 
-enum SwapKind:
-  GIVEN_IN
-  GIVEN_OUT
+GIVEN_IN: constant(uint8) = 0
 
 struct SingleSwap:
   poolId: bytes32
-  kind: SwapKind
+  kind: uint8
   assetIn: address
   assetOut: address
   amount: uint256
@@ -173,7 +171,7 @@ def execute(id: uint256) -> uint256:
   sellAmount: uint256 = self.totalPledged[id]
   swap: SingleSwap = SingleSwap({
     poolId: pledge.poolId,
-    kind: SwapKind.GIVEN_IN,
+    kind: GIVEN_IN,
     assetIn: pledge.sellToken.address,
     assetOut: pledge.buyToken.address,
     amount: sellAmount,

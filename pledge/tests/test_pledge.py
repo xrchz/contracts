@@ -21,9 +21,9 @@ def test_create_bad_deadline(pledgeContract, accounts, chain):
             RETH_RPL_POOL_ID,
             chain.blocks.head.timestamp,
             RPL_ADDRESS,
-            '4.2 ETH',
+            '4.2 ether',
             RETH_ADDRESS,
-            '0.05 ETH'), 1, 0, sender=accounts[1])
+            '0.05 ether'), 1, 0, sender=accounts[1])
 
 def test_create_bad_indices(pledgeContract, accounts, chain):
     with reverts('buyToken'):
@@ -31,9 +31,9 @@ def test_create_bad_indices(pledgeContract, accounts, chain):
             RETH_RPL_POOL_ID,
             chain.blocks.head.timestamp + ONE_HOUR_SECONDS,
             RPL_ADDRESS,
-            '4.2 ETH',
+            '4.2 ether',
             RETH_ADDRESS,
-            '0.05 ETH'), 0, 1, sender=accounts[1])
+            '0.05 ether'), 0, 1, sender=accounts[1])
 
 @pytest.fixture
 def createdPledge(pledgeContract, accounts, chain):
@@ -41,48 +41,92 @@ def createdPledge(pledgeContract, accounts, chain):
         RETH_RPL_POOL_ID,
         chain.blocks.head.timestamp + ONE_DAY_SECONDS,
         RPL_ADDRESS,
-        '4.2 ETH',
+        '4.2 ether',
         RETH_ADDRESS,
-        '0.05 ETH'), 1, 0, sender=accounts[1])
+        '0.05 ether'), 1, 0, sender=accounts[1])
     return receipt.return_value
 
 def test_create(pledgeContract, createdPledge):
     assert pledgeContract.numPledges() == 1
+    assert pledgeContract.pledges(createdPledge)['minBuy'] == to_wei('4.2', 'ether')
 
 @pytest.fixture
-def rETHHolder(accounts):
+def rETHWhale(accounts):
     return accounts['0x742b8ea0754e4ac12b3f72e92d686c0b0664eee4'] # rethwhale.eth
 
-def test_add_pledge_unapproved(pledgeContract, createdPledge, rETHHolder):
+@pytest.fixture
+def rETHFish(accounts):
+    return accounts['0x849b5E5116F1C3E8AdeB8Ef85562233ccE4C696B'] # immortall69.eth
+
+def test_add_pledge_unapproved(pledgeContract, createdPledge, rETHWhale):
     with reverts('ERC20: transfer amount exceeds allowance'):
-        pledgeContract.pledge(createdPledge, '42 gwei', sender=rETHHolder)
+        pledgeContract.pledge(createdPledge, '42 gwei', sender=rETHWhale)
 
 @pytest.fixture
-def addPledge(pledgeContract, createdPledge, rETHHolder):
+def addPledge(pledgeContract, createdPledge, rETHWhale):
     rETH = Contract(RETH_ADDRESS)
     amount = to_wei(42, 'gwei')
-    prevBalance = rETH.balanceOf(rETHHolder)
-    rETH.approve(pledgeContract.address, amount, sender=rETHHolder)
-    pledgeContract.pledge(createdPledge, amount, sender=rETHHolder)
-    return {'amount': amount, 'rETH': rETH, 'prevBalance': prevBalance}
+    prevBalance = rETH.balanceOf(rETHWhale)
+    rETH.approve(pledgeContract.address, amount, sender=rETHWhale)
+    pledgeContract.pledge(createdPledge, amount, sender=rETHWhale)
+    return {'amount': amount, 'rETH': rETH, 'prevBalance': prevBalance, 'sender': rETHWhale}
 
-def test_add_pledge(pledgeContract, createdPledge, addPledge, rETHHolder):
+@pytest.fixture
+def addPledge2(pledgeContract, createdPledge, addPledge, rETHFish):
+    rETH = addPledge['rETH']
+    amount = to_wei('0.04', 'ether')
+    prevBalance = rETH.balanceOf(rETHFish)
+    rETH.approve(pledgeContract.address, amount, sender=rETHFish)
+    pledgeContract.pledge(createdPledge, amount, sender=rETHFish)
+    return {'amount': amount, 'prevBalance': prevBalance, 'sender': rETHFish}
+
+def test_add_pledge(pledgeContract, createdPledge, addPledge, rETHWhale):
     rETH = addPledge['rETH']
     amount = addPledge['amount']
     assert pledgeContract.totalPledged(createdPledge) == amount
     assert pledgeContract.activePledgers(createdPledge) == 1
-    assert pledgeContract.pledged(createdPledge, rETHHolder) == amount
+    assert pledgeContract.pledged(createdPledge, rETHWhale) == amount
     assert rETH.balanceOf(pledgeContract) == 0
-    assert rETH.balanceOf(rETHHolder) == addPledge['prevBalance'] - amount
+    assert rETH.balanceOf(rETHWhale) == addPledge['prevBalance'] - amount
 
-def test_refund_before_deadline(pledgeContract, createdPledge, addPledge, rETHHolder):
+def test_refund_before_deadline(pledgeContract, createdPledge, addPledge, rETHWhale):
     with reverts('active'):
-        pledgeContract.refund(createdPledge, sender=rETHHolder)
+        pledgeContract.refund(createdPledge, sender=rETHWhale)
 
-def test_claim_before_bought(pledgeContract, createdPledge, addPledge, rETHHolder):
+def test_claim_before_bought(pledgeContract, createdPledge, addPledge, rETHWhale):
     with reverts('pending'):
-        pledgeContract.claim(createdPledge, sender=rETHHolder)
+        pledgeContract.claim(createdPledge, sender=rETHWhale)
 
-def test_dust_before_deadline(pledgeContract, createdPledge, addPledge, rETHHolder):
+def test_dust_before_deadline(pledgeContract, createdPledge, addPledge, rETHWhale, chain):
+    assert chain.blocks.head.timestamp < pledgeContract.pledges(createdPledge)['deadline']
     with reverts('active'):
-        pledgeContract.dust(createdPledge, sender=rETHHolder)
+        pledgeContract.dust(createdPledge, sender=rETHWhale)
+
+def test_execute_before_min(pledgeContract, createdPledge, addPledge, accounts):
+    with reverts('minBuy'):
+        receipt = pledgeContract.execute(createdPledge, sender=accounts[2])
+
+def test_refund_after_deadline(pledgeContract, createdPledge, addPledge, rETHWhale, chain):
+    chain.mine(1, None, ONE_DAY_SECONDS)
+    assert chain.blocks.head.timestamp > pledgeContract.pledges(createdPledge)['deadline']
+    rETH = addPledge['rETH']
+    prevBalance = rETH.balanceOf(rETHWhale)
+    receipt = pledgeContract.refund(createdPledge, sender=rETHWhale)
+    assert rETH.balanceOf(rETHWhale) == addPledge['prevBalance']
+    assert receipt.return_value + prevBalance == addPledge['prevBalance']
+    assert pledgeContract.pledged(createdPledge, rETHWhale) == 0
+    assert pledgeContract.activePledgers(createdPledge) == 0
+
+def test_refund_not_pledger(pledgeContract, createdPledge, addPledge, accounts, chain):
+    chain.mine(1, None, ONE_DAY_SECONDS)
+    assert chain.blocks.head.timestamp > pledgeContract.pledges(createdPledge)['deadline']
+    with reverts('empty'):
+        pledgeContract.refund(createdPledge, sender=accounts[2])
+
+def test_pledge2(pledgeContract, createdPledge, addPledge, addPledge2):
+    assert pledgeContract.numPledges() == 1
+    assert pledgeContract.activePledgers(createdPledge) == 2
+    assert pledgeContract.totalPledged(createdPledge) == addPledge2['amount'] + addPledge['amount']
+    assert pledgeContract.totalBought(createdPledge) == 0
+    assert pledgeContract.totalClaimed(createdPledge) == 0
+    assert pledgeContract.pledged(createdPledge, addPledge2['sender']) == addPledge2['amount']
