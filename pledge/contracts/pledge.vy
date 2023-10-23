@@ -31,14 +31,11 @@ struct FundManagement:
   recipient: address
   toInternalBalance: bool
 
-enum UserBalanceOpKind:
-    DEPOSIT_INTERNAL
-    WITHDRAW_INTERNAL
-    TRANSFER_INTERNAL
-    TRANSFER_EXTERNAL
+DEPOSIT_INTERNAL: constant(uint8) = 0
+WITHDRAW_INTERNAL: constant(uint8) = 1
 
 struct UserBalanceOp:
-    kind: UserBalanceOpKind
+    kind: uint8
     asset: address
     amount: uint256
     sender: address
@@ -56,7 +53,7 @@ interface BalancerVault:
     uint256): view
   def manageUserBalance(ops: DynArray[UserBalanceOp, 1]): nonpayable
 
-vault: immutable(BalancerVault)
+vault: public(immutable(BalancerVault))
 
 struct PledgeInfo:
   poolId: bytes32
@@ -130,21 +127,23 @@ def __init__():
   })
 
 @external
-def create(pledge: PledgeInfo, buyTokenIndex: uint256, sellTokenIndex: uint256):
+def create(pledge: PledgeInfo, buyTokenIndex: uint256, sellTokenIndex: uint256) -> uint256:
   assert block.timestamp < pledge.deadline, "deadline"
   assert 0 < pledge.minBuy, "minBuy"
   tokens: DynArray[ERC20, MAX_TOKENS_PER_POOL] = vault.getPoolTokens(pledge.poolId)[0]
   assert tokens[buyTokenIndex] == pledge.buyToken, "buyToken"
   assert tokens[sellTokenIndex] == pledge.sellToken, "sellToken"
-  self.pledges[self.numPledges] = pledge
+  id: uint256 = self.numPledges
+  self.pledges[id] = pledge
+  self.numPledges += 1
   log Create(
-    self.numPledges,
+    id,
     pledge.buyToken.address,
     pledge.sellToken.address,
     pledge.minBuy,
     pledge.maxSellForMin,
     pledge.deadline)
-  self.numPledges += 1
+  return id
 
 @external
 def pledge(id: uint256, amount: uint256):
@@ -154,7 +153,7 @@ def pledge(id: uint256, amount: uint256):
   assert pledge.sellToken.transferFrom(msg.sender, self, amount), "transferFrom"
   assert pledge.sellToken.approve(vault.address, amount), "approve"
   vault.manageUserBalance([UserBalanceOp({
-    kind: UserBalanceOpKind.DEPOSIT_INTERNAL,
+    kind: DEPOSIT_INTERNAL,
     asset: pledge.sellToken.address,
     amount: amount,
     sender: self,
@@ -166,7 +165,7 @@ def pledge(id: uint256, amount: uint256):
   log Pledge(id, msg.sender, amount)
 
 @external
-def execute(id: uint256):
+def execute(id: uint256) -> uint256:
   assert id < self.numPledges, "id"
   pledge: PledgeInfo = self.pledges[id]
   assert block.timestamp < pledge.deadline, "expired"
@@ -185,9 +184,10 @@ def execute(id: uint256):
   assert buyAmount / pledge.minBuy * pledge.maxSellForMin <= sellAmount, "price"
   self.totalBought[id] = buyAmount
   log Execute(id, sellAmount, buyAmount)
+  return buyAmount
 
 @external
-def claim(id: uint256):
+def claim(id: uint256) -> uint256:
   assert id < self.numPledges, "id"
   pledge: PledgeInfo = self.pledges[id]
   assert 0 < self.totalBought[id], "pending"
@@ -195,7 +195,7 @@ def claim(id: uint256):
   assert 0 < sellAmount, "empty"
   buyAmount: uint256 = sellAmount * self.totalBought[id] / self.totalPledged[id]
   vault.manageUserBalance([UserBalanceOp({
-    kind: UserBalanceOpKind.WITHDRAW_INTERNAL,
+    kind: WITHDRAW_INTERNAL,
     asset: pledge.buyToken.address,
     amount: buyAmount,
     sender: self,
@@ -206,9 +206,10 @@ def claim(id: uint256):
   self.totalClaimed[id] += buyAmount
   self.activePledgers[id] -= 1
   log Claim(id, msg.sender, buyAmount, sellAmount)
+  return buyAmount
 
 @external
-def dust(id: uint256):
+def dust(id: uint256) -> uint256:
   assert id < self.numPledges, "id"
   pledge: PledgeInfo = self.pledges[id]
   assert pledge.deadline < block.timestamp, "active"
@@ -217,7 +218,7 @@ def dust(id: uint256):
   buyAmount: uint256 = self.totalBought[id] - self.totalClaimed[id]
   assert 0 < buyAmount, "empty"
   vault.manageUserBalance([UserBalanceOp({
-    kind: UserBalanceOpKind.WITHDRAW_INTERNAL,
+    kind: WITHDRAW_INTERNAL,
     asset: pledge.buyToken.address,
     amount: buyAmount,
     sender: self,
@@ -226,9 +227,10 @@ def dust(id: uint256):
   assert pledge.buyToken.transfer(msg.sender, buyAmount), "transfer"
   self.totalClaimed[id] += buyAmount
   log Dust(id, msg.sender, buyAmount)
+  return buyAmount
 
 @external
-def refund(id: uint256):
+def refund(id: uint256) -> uint256:
   assert id < self.numPledges, "id"
   pledge: PledgeInfo = self.pledges[id]
   assert pledge.deadline < block.timestamp, "active"
@@ -236,7 +238,7 @@ def refund(id: uint256):
   amount: uint256 = self.pledged[id][msg.sender]
   assert 0 < amount, "empty"
   vault.manageUserBalance([UserBalanceOp({
-    kind: UserBalanceOpKind.WITHDRAW_INTERNAL,
+    kind: WITHDRAW_INTERNAL,
     asset: pledge.sellToken.address,
     amount: amount,
     sender: self,
@@ -246,3 +248,4 @@ def refund(id: uint256):
   self.pledged[id][msg.sender] = 0
   self.activePledgers[id] -= 1
   log Refund(id, msg.sender, amount)
+  return amount
