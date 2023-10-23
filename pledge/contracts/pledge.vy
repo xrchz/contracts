@@ -131,7 +131,7 @@ def __init__():
 
 @external
 def create(pledge: PledgeInfo, buyTokenIndex: uint256, sellTokenIndex: uint256):
-  assert block.timestamp < pledge.deadline, "deadline must be in future"
+  assert block.timestamp < pledge.deadline, "deadline"
   assert 0 < pledge.minBuy, "minBuy"
   tokens: DynArray[ERC20, MAX_TOKENS_PER_POOL] = vault.getPoolTokens(pledge.poolId)[0]
   assert tokens[buyTokenIndex] == pledge.buyToken, "buyToken"
