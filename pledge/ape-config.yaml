@@ -1,0 +1,6 @@
+plugins:
+  - vyper
+  - foundry
+  - etherscan
+foundry:
+  host: auto
