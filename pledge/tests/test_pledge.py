@@ -146,7 +146,7 @@ def test_execute_before_min2(pledgeContract, createdPledge, addPledge2, accounts
 
 def test_pledge3(pledgeContract, createdPledge, addPledge, addPledge2, addPledge3):
     assert pledgeContract.numPledges() == 1
-    assert pledgeContract.activePledgers(createdPledge) == 3
+    assert pledgeContract.activePledgers(createdPledge) == 2 # one pledger went twice
     assert (pledgeContract.totalPledged(createdPledge) ==
             addPledge3['amount'] + addPledge2['amount'] + addPledge['amount'])
     assert pledgeContract.totalBought(createdPledge) == 0
@@ -166,10 +166,15 @@ def executed(pledgeContract, createdPledge, addPledge3, accounts):
 def test_executed(pledgeContract, createdPledge, executed):
     assert executed.return_value >= pledgeContract.pledges(createdPledge).minBuy
 
-def test_claim(pledgeContract, createdPledge, executed, rETHWhale):
+def test_claim(pledgeContract, createdPledge, addPledge, addPledge2, addPledge3, executed, rETHWhale):
     RPL = Contract(RPL_ADDRESS)
     prevBalance = RPL.balanceOf(rETHWhale)
     receipt = pledgeContract.claim(createdPledge, sender=rETHWhale)
     assert RPL.balanceOf(rETHWhale) == prevBalance + receipt.return_value
     assert pledgeContract.activePledgers(createdPledge) == 1
-    # TODO: check amount received is good
+    assert receipt.return_value
+    amountSold = addPledge['amount'] + addPledge3['amount']
+    totalSold = amountSold + addPledge2['amount']
+    totalBought = executed.return_value
+    amountBought = receipt.return_value
+    assert amountBought / totalBought == amountSold / totalSold
