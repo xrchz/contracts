@@ -159,9 +159,10 @@ def pledge(id: uint256, amount: uint256):
     sender: self,
     recipient: self
   })])
+  if self.pledged[id][msg.sender] == 0:
+    self.activePledgers[id] += 1
   self.pledged[id][msg.sender] += amount
   self.totalPledged[id] += amount
-  self.activePledgers[id] += 1
   log Pledge(id, msg.sender, amount)
 
 @external

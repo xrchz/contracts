@@ -165,3 +165,11 @@ def executed(pledgeContract, createdPledge, addPledge3, accounts):
 
 def test_executed(pledgeContract, createdPledge, executed):
     assert executed.return_value >= pledgeContract.pledges(createdPledge).minBuy
+
+def test_claim(pledgeContract, createdPledge, executed, rETHWhale):
+    RPL = Contract(RPL_ADDRESS)
+    prevBalance = RPL.balanceOf(rETHWhale)
+    receipt = pledgeContract.claim(createdPledge, sender=rETHWhale)
+    assert RPL.balanceOf(rETHWhale) == prevBalance + receipt.return_value
+    assert pledgeContract.activePledgers(createdPledge) == 1
+    # TODO: check amount received is good
