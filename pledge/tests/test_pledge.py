@@ -43,7 +43,7 @@ def createdPledge(pledgeContract, accounts, chain):
         RPL_ADDRESS,
         '4.2 ether',
         RETH_ADDRESS,
-        '0.05 ether'), 1, 0, sender=accounts[1])
+        '0.069 ether'), 1, 0, sender=accounts[1])
     return receipt.return_value
 
 def test_create(pledgeContract, createdPledge):
@@ -79,6 +79,15 @@ def addPledge2(pledgeContract, createdPledge, addPledge, rETHFish):
     rETH.approve(pledgeContract.address, amount, sender=rETHFish)
     pledgeContract.pledge(createdPledge, amount, sender=rETHFish)
     return {'amount': amount, 'prevBalance': prevBalance, 'sender': rETHFish}
+
+@pytest.fixture
+def addPledge3(pledgeContract, createdPledge, addPledge, addPledge2, rETHWhale):
+    rETH = addPledge['rETH']
+    amount = to_wei('0.1', 'ether')
+    prevBalance = rETH.balanceOf(rETHWhale)
+    rETH.approve(pledgeContract.address, amount, sender=rETHWhale)
+    pledgeContract.pledge(createdPledge, amount, sender=rETHWhale)
+    return {'amount': amount, 'prevBalance': prevBalance, 'sender': rETHWhale}
 
 def test_add_pledge(pledgeContract, createdPledge, addPledge, rETHWhale):
     rETH = addPledge['rETH']
@@ -130,3 +139,29 @@ def test_pledge2(pledgeContract, createdPledge, addPledge, addPledge2):
     assert pledgeContract.totalBought(createdPledge) == 0
     assert pledgeContract.totalClaimed(createdPledge) == 0
     assert pledgeContract.pledged(createdPledge, addPledge2['sender']) == addPledge2['amount']
+
+def test_execute_before_min2(pledgeContract, createdPledge, addPledge2, accounts):
+    with reverts('minBuy'):
+        pledgeContract.execute(createdPledge, sender=accounts[2])
+
+def test_pledge3(pledgeContract, createdPledge, addPledge, addPledge2, addPledge3):
+    assert pledgeContract.numPledges() == 1
+    assert pledgeContract.activePledgers(createdPledge) == 3
+    assert (pledgeContract.totalPledged(createdPledge) ==
+            addPledge3['amount'] + addPledge2['amount'] + addPledge['amount'])
+    assert pledgeContract.totalBought(createdPledge) == 0
+    assert pledgeContract.totalClaimed(createdPledge) == 0
+    assert (pledgeContract.pledged(createdPledge, addPledge3['sender']) ==
+            addPledge['amount'] + addPledge3['amount'])
+
+def test_execute_after_deadline(pledgeContract, createdPledge, addPledge3, accounts, chain):
+    chain.mine(1, None, ONE_DAY_SECONDS)
+    with reverts('expired'):
+        pledgeContract.execute(createdPledge, sender=accounts[1])
+
+@pytest.fixture
+def executed(pledgeContract, createdPledge, addPledge3, accounts):
+    return pledgeContract.execute(createdPledge, sender=accounts[2])
+
+def test_executed(pledgeContract, createdPledge, executed):
+    assert executed.return_value >= pledgeContract.pledges(createdPledge).minBuy

@@ -13,6 +13,8 @@ interface ERC20:
   def transfer(_to: address, _amount: uint256) -> bool: nonpayable
   def transferFrom(_from: address, _to: address, _amount: uint256) -> bool: nonpayable
 
+CALC_BASIS: constant(uint256) = 10 ** 18
+
 GIVEN_IN: constant(uint8) = 0
 
 struct SingleSwap:
@@ -176,10 +178,11 @@ def execute(id: uint256) -> uint256:
     assetOut: pledge.buyToken.address,
     amount: sellAmount,
     userData: b''})
-  limit: uint256 = sellAmount / pledge.maxSellForMin * pledge.minBuy
-  buyAmount: uint256 = vault.swap(swap, selfFunds, limit, block.timestamp)
+  limit: uint256 = CALC_BASIS * sellAmount / pledge.maxSellForMin * pledge.minBuy
+  buyAmount: uint256 = vault.swap(swap, selfFunds, limit / CALC_BASIS, block.timestamp)
   assert buyAmount >= pledge.minBuy, "minBuy"
-  assert buyAmount / pledge.minBuy * pledge.maxSellForMin <= sellAmount, "price"
+  assert (CALC_BASIS * sellAmount <=
+          CALC_BASIS * buyAmount / pledge.minBuy * pledge.maxSellForMin), "price"
   self.totalBought[id] = buyAmount
   log Execute(id, sellAmount, buyAmount)
   return buyAmount
@@ -191,7 +194,8 @@ def claim(id: uint256) -> uint256:
   assert 0 < self.totalBought[id], "pending"
   sellAmount: uint256 = self.pledged[id][msg.sender]
   assert 0 < sellAmount, "empty"
-  buyAmount: uint256 = sellAmount * self.totalBought[id] / self.totalPledged[id]
+  calcBuyAmount: uint256 = CALC_BASIS * sellAmount * self.totalBought[id] / self.totalPledged[id]
+  buyAmount: uint256 = calcBuyAmount / CALC_BASIS
   vault.manageUserBalance([UserBalanceOp({
     kind: WITHDRAW_INTERNAL,
     asset: pledge.buyToken.address,
