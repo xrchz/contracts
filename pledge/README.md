@@ -57,25 +57,74 @@ Create a new pledging agreement for people to participate in.
 
 Commit `amount` of `sellToken` to the pledging agreement `id`.
 
+#### Arguments
+- `id`: the identifier for the pledging agreement.
+- `amount`: the amount of `sellToken` to commit.
+
+#### Emits
+- `Pledge(uint256 indexed id, address indexed caller, address indexed amount)`
+
+#### Errors
+- `"expired"`: if the `deadline` has already been reached (is before or equal to `block.timestamp`).
+- `"executed"`: if the agreement has already been executed.
+- `"transferFrom"`: if `amount` `sellToken` tokens could not be transferred from the caller. The pledging contract needs to have an allowance of at least `amount` tokens approved by the caller.
+- `"approve"`: if the pledging contract fails to approve the Balancer vault to spend its `sellToken` tokens.
+
 ### execute
 `execute(uint256 id) → uint256 amountBought`
 
 Execute the trade of `sellToken` for `buyToken` represented by the pledging agreement `id`.
+
+#### Arguments
+- `id`: the identifier for the pledging agreement.
+
+#### Emits
+
+#### Returns
+
+#### Errors
 
 ### claim
 `claim(uint256 id) → uint256 amountBought`
 
 Claim the portion of the `buyToken` tokens obtained via a successfully executed pledging agreement `id` owed to the caller.
 
+#### Arguments
+- `id`: the identifier for the pledging agreement.
+
+#### Emits
+
+#### Returns
+
+#### Errors
+
 ### dust
 `dust(uint256 id) → uint256 amountDusted`
 
 Claim any remaining `buyToken` tokens left over due to rounding errors after all claims have been made on the pledging agreement `id`.
 
+#### Arguments
+- `id`: the identifier for the pledging agreement.
+
+#### Emits
+
+#### Returns
+
+#### Errors
+
 ### refund
 `refund(uint256 id) → uint256 amountRefunded`
 
 Return the `sellToken` tokens committed by the caller to an expired pledging agreement `id`.
+
+#### Arguments
+- `id`: the identifier for the pledging agreement.
+
+#### Emits
+
+#### Returns
+
+#### Errors
 
 ## Views
 
