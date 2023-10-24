@@ -1,0 +1,23 @@
+#!/usr/bin/env bash
+
+set -euo pipefail
+cd "$(dirname "$0")/.."
+
+docker build -t xrchz/pledge:latest .
+
+# If no command is supplied, drop into a shell, otherwise run the provided ape command
+if [[ -z "$@" ]]; then
+    entrypoint=bash
+else
+    entrypoint=ape
+fi
+
+docker run \
+    --rm \
+    --interactive \
+    --tty \
+    --env-file .env \
+    --volume $PWD:/home/harambe/project \
+    --entrypoint "$entrypoint" \
+    xrchz/pledge:latest \
+    $@
