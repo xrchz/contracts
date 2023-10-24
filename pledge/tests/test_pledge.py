@@ -178,3 +178,47 @@ def test_claim(pledgeContract, createdPledge, addPledge, addPledge2, addPledge3,
     totalBought = executed.return_value
     amountBought = receipt.return_value
     assert amountBought / totalBought == amountSold / totalSold
+
+def test_claim_not_pledger(pledgeContract, createdPledge, executed, accounts):
+    with reverts('empty'):
+        pledgeContract.claim(createdPledge, sender=accounts[2])
+
+def test_claim_twice(pledgeContract, createdPledge, executed, rETHFish):
+    pledgeContract.claim(createdPledge, sender=rETHFish)
+    with reverts('empty'):
+        pledgeContract.claim(createdPledge, sender=rETHFish)
+
+def test_claim_twice2(pledgeContract, createdPledge, executed, rETHWhale):
+    pledgeContract.claim(createdPledge, sender=rETHWhale)
+    with reverts('empty'):
+        pledgeContract.claim(createdPledge, sender=rETHWhale)
+
+def test_claim_second(pledgeContract, createdPledge, executed, rETHFish, rETHWhale):
+    pledgeContract.claim(createdPledge, sender=rETHFish)
+    pledgeContract.claim(createdPledge, sender=rETHWhale)
+    assert pledgeContract.activePledgers(createdPledge) == 0
+    dust = pledgeContract.totalBought(createdPledge) - pledgeContract.totalClaimed(createdPledge)
+    assert dust <= 2
+
+def test_claim_dust_before_deadline(pledgeContract, createdPledge, executed, rETHFish, rETHWhale):
+    pledgeContract.claim(createdPledge, sender=rETHFish)
+    with reverts('active'):
+        pledgeContract.dust(createdPledge, sender=rETHWhale)
+
+def test_claim_dust_before_claimants(pledgeContract, createdPledge, executed,
+                                     rETHFish, rETHWhale, chain):
+    pledgeContract.claim(createdPledge, sender=rETHFish)
+    chain.mine(1, None, ONE_DAY_SECONDS)
+    with reverts('claimants'):
+        pledgeContract.dust(createdPledge, sender=rETHWhale)
+
+def test_claim_dust(pledgeContract, createdPledge, executed,
+                    rETHFish, rETHWhale, chain, accounts):
+    pledgeContract.claim(createdPledge, sender=rETHFish)
+    pledgeContract.claim(createdPledge, sender=rETHWhale)
+    chain.mine(1, None, ONE_DAY_SECONDS)
+    buyToken = Contract(pledgeContract.pledges(createdPledge)['buyToken'])
+    prevBalance = buyToken.balanceOf(accounts[2])
+    receipt = pledgeContract.dust(createdPledge, sender=accounts[2])
+    assert pledgeContract.totalBought(createdPledge) == pledgeContract.totalClaimed(createdPledge)
+    assert buyToken.balanceOf(accounts[2]) == prevBalance + receipt.return_value
