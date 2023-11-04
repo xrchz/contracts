@@ -182,11 +182,19 @@ View the total amount of `sellToken` ever committed to the pledging agreement `i
 ### totalBought
 `totalBought(uint256 id) → uint256`
 
+View the total amount of `buyToken` that has been bought by selling `sellToken` for pledging agreement `id`.
+
 ### totalClaimed
 `totalClaimed(uint256 id) → uint256`
+
+View the total amount of `buyToken` that has been paid out to pledgers in agreement `id`.
 
 ### activePledgers
 `activePledgers(uint256 id) → uint256`
 
+View the total number of pledgers in agreement `id` who have not yet claimed their `buyToken` or refunded their `sellToken`.
+
 ### pledged
 `pledged(uint256 id, address user) → uint256`
+
+View the amount of `sellToken` pledged by `user` in agreement `id` that has not yet been refunded or sold.
